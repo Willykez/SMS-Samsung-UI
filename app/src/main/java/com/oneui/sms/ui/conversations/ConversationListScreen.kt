@@ -1,13 +1,13 @@
 package com.oneui.sms.ui.conversations
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
@@ -32,8 +32,6 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -42,9 +40,10 @@ import androidx.compose.ui.unit.dp
 import com.oneui.sms.data.local.ConversationEntity
 
 /**
- * Implements the One UI "viewing area" pattern: a large collapsible header
- * (title + search) that shrinks as the list scrolls, handing space back to
- * content — rather than a fixed small toolbar.
+ * One UI-inspired conversation list.
+ *
+ * Uses a large collapsible Material 3 top app bar and a conversation list
+ * beneath it. Conversations support swipe-to-delete and swipe-to-archive.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -57,26 +56,44 @@ fun ConversationListScreen(
     modifier: Modifier = Modifier,
 ) {
     val topBarState = rememberTopAppBarState()
-    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(topBarState)
+
+    val scrollBehavior =
+        TopAppBarDefaults.exitUntilCollapsedScrollBehavior(topBarState)
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
         topBar = {
             LargeTopAppBar(
-                title = { Text("Messages", fontWeight = FontWeight.Bold) },
+                title = {
+                    Text(
+                        text = "Messages",
+                        fontWeight = FontWeight.Bold,
+                    )
+                },
                 actions = {
-                    IconButton(onClick = { /* open search */ }) {
-                        Icon(Icons.Filled.Search, contentDescription = "Search")
+                    IconButton(
+                        onClick = {
+                            // Search action can be connected when search UI
+                            // is implemented.
+                        },
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Search,
+                            contentDescription = "Search",
+                        )
                     }
                 },
                 scrollBehavior = scrollBehavior,
             )
         },
         floatingActionButton = {
-            // Anchored bottom-right, within the natural thumb sweep per One UI's
-            // "Interact Naturally" pillar.
-            FloatingActionButton(onClick = onCompose) {
-                Icon(Icons.Filled.Add, contentDescription = "New message")
+            FloatingActionButton(
+                onClick = onCompose,
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Add,
+                    contentDescription = "New message",
+                )
             }
         },
     ) { padding ->
@@ -87,14 +104,25 @@ fun ConversationListScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(padding),
-                contentPadding = PaddingValues(vertical = 4.dp),
+                contentPadding = PaddingValues(
+                    vertical = 4.dp,
+                ),
             ) {
-                items(conversations, key = { it.threadId }) { convo ->
+                items(
+                    items = conversations,
+                    key = { it.threadId },
+                ) { conversation ->
                     SwipeableConversationRow(
-                        conversation = convo,
-                        onOpen = { onOpenConversation(convo.threadId) },
-                        onArchive = { onArchive(convo.threadId) },
-                        onDelete = { onDelete(convo.threadId) },
+                        conversation = conversation,
+                        onOpen = {
+                            onOpenConversation(conversation.threadId)
+                        },
+                        onArchive = {
+                            onArchive(conversation.threadId)
+                        },
+                        onDelete = {
+                            onDelete(conversation.threadId)
+                        },
                     )
                 }
             }
@@ -113,8 +141,16 @@ private fun SwipeableConversationRow(
     val dismissState = rememberSwipeToDismissBoxState(
         confirmValueChange = { value ->
             when (value) {
-                SwipeToDismissBoxValue.EndToStart -> { onDelete(); true }
-                SwipeToDismissBoxValue.StartToEnd -> { onArchive(); true }
+                SwipeToDismissBoxValue.EndToStart -> {
+                    onDelete()
+                    true
+                }
+
+                SwipeToDismissBoxValue.StartToEnd -> {
+                    onArchive()
+                    true
+                }
+
                 else -> false
             }
         },
@@ -122,76 +158,134 @@ private fun SwipeableConversationRow(
 
     SwipeToDismissBox(
         state = dismissState,
-        backgroundContent = { SwipeBackground(dismissState.dismissDirection) },
+        backgroundContent = {
+            SwipeBackground(
+                direction = dismissState.dismissDirection,
+            )
+        },
     ) {
-        ConversationRow(conversation = conversation, onClick = onOpen)
+        ConversationRow(
+            conversation = conversation,
+            onClick = onOpen,
+        )
     }
 }
 
 @Composable
-private fun SwipeBackground(direction: SwipeToDismissBoxValue) {
-    val (color, label) = when (direction) {
-        SwipeToDismissBoxValue.StartToEnd -> MaterialTheme.colorScheme.primary to "Archive"
-        SwipeToDismissBoxValue.EndToStart -> MaterialTheme.colorScheme.error to "Delete"
-        else -> MaterialTheme.colorScheme.surface to ""
+private fun SwipeBackground(
+    direction: SwipeToDismissBoxValue,
+) {
+    val (backgroundColor, label) = when (direction) {
+        SwipeToDismissBoxValue.StartToEnd ->
+            MaterialTheme.colorScheme.primary to "Archive"
+
+        SwipeToDismissBoxValue.EndToStart ->
+            MaterialTheme.colorScheme.error to "Delete"
+
+        else ->
+            MaterialTheme.colorScheme.surface to ""
     }
+
     Row(
-        Modifier
+        modifier = Modifier
             .fillMaxSize()
-            .background(color)
+            .background(backgroundColor)
             .padding(horizontal = 24.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = if (direction == SwipeToDismissBoxValue.StartToEnd) Arrangement.Start else Arrangement.End,
+        horizontalArrangement =
+            if (direction == SwipeToDismissBoxValue.StartToEnd) {
+                Arrangement.Start
+            } else {
+                Arrangement.End
+            },
     ) {
-        Text(label, color = MaterialTheme.colorScheme.onPrimary, fontWeight = FontWeight.Medium)
+        Text(
+            text = label,
+            color = MaterialTheme.colorScheme.onPrimary,
+            fontWeight = FontWeight.Medium,
+        )
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun ConversationRow(conversation: ConversationEntity, onClick: () -> Unit) {
+private fun ConversationRow(
+    conversation: ConversationEntity,
+    onClick: () -> Unit,
+) {
     ListItem(
-        modifier = Modifier.padding(horizontal = 4.dp),
+        modifier = Modifier
+            .padding(horizontal = 4.dp)
+            .clip(MaterialTheme.shapes.medium)
+            .clickable(onClick = onClick),
         leadingContent = {
             Surface(
                 shape = CircleShape,
                 color = MaterialTheme.colorScheme.primaryContainer,
                 modifier = Modifier.size(48.dp),
             ) {
-                Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                    Text((conversation.displayName ?: conversation.address).take(1).uppercase())
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = (
+                            conversation.displayName
+                                ?: conversation.address
+                            )
+                            .take(1)
+                            .uppercase(),
+                    )
                 }
             }
         },
         headlineContent = {
             Text(
-                conversation.displayName ?: conversation.address,
-                fontWeight = if (conversation.unreadCount > 0) FontWeight.Bold else FontWeight.Normal,
+                text = conversation.displayName ?: conversation.address,
+                fontWeight =
+                    if (conversation.unreadCount > 0) {
+                        FontWeight.Bold
+                    } else {
+                        FontWeight.Normal
+                    },
             )
         },
         supportingContent = {
             Text(
-                conversation.snippet,
+                text = conversation.snippet,
                 maxLines = 1,
-                fontWeight = if (conversation.unreadCount > 0) FontWeight.SemiBold else FontWeight.Normal,
+                fontWeight =
+                    if (conversation.unreadCount > 0) {
+                        FontWeight.SemiBold
+                    } else {
+                        FontWeight.Normal
+                    },
             )
         },
         trailingContent = {
             if (conversation.unreadCount > 0) {
-                Surface(shape = CircleShape, color = MaterialTheme.colorScheme.primary) {
+                Surface(
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.primary,
+                ) {
                     Text(
-                        conversation.unreadCount.toString(),
+                        text = conversation.unreadCount.toString(),
                         color = MaterialTheme.colorScheme.onPrimary,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+                        modifier = Modifier.padding(
+                            horizontal = 8.dp,
+                            vertical = 2.dp,
+                        ),
                     )
                 }
             }
         },
-        modifier = Modifier.clip(MaterialTheme.shapes.medium),
     )
 }
 
 @Composable
-private fun EmptyState(padding: PaddingValues) {
+private fun EmptyState(
+    padding: PaddingValues,
+) {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -200,7 +294,15 @@ private fun EmptyState(padding: PaddingValues) {
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Text("No messages yet", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
-        Text("Tap + to start a conversation", style = MaterialTheme.typography.bodyMedium)
+        Text(
+            text = "No messages yet",
+            fontWeight = FontWeight.Bold,
+            style = MaterialTheme.typography.titleMedium,
+        )
+
+        Text(
+            text = "Tap + to start a conversation",
+            style = MaterialTheme.typography.bodyMedium,
+        )
     }
 }
