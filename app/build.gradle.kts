@@ -41,6 +41,7 @@ dependencies {
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-graphics")
     implementation("androidx.compose.material3:material3")
+    implementation("androidx.compose.material:material-icons-extended") // FilterList, PushPin, Restore, Schedule, StarBorder, etc.
     implementation("androidx.navigation:navigation-compose:2.7.7")
 
     // Room for local thread/message cache mirroring the Telephony provider

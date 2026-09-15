@@ -4,47 +4,25 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-
-    <!-- Main message bubble -->
+    <!--
+      Adaptive icon safe zone is the centered 66dp circle; the glyph below
+      is a rounded chat-bubble kept comfortably inside that zone so it
+      isn't clipped on launchers that mask to a circle/squircle/square.
+    -->
     <path
-        android:fillColor="#FFFFFFFF"
-        android:pathData="
-            M24,28
-            C24,21.37 29.37,16 36,16
-            L72,16
-            C78.63,16 84,21.37 84,28
-            L84,57
-            C84,63.63 78.63,69 72,69
-            L48,69
-            L34,82
-            L36,69
-            L36,69
-            C29.37,69 24,63.63 24,57
-            Z" />
-
-    <!-- Message lines -->
+        android:fillColor="#FFFFFF"
+        android:pathData="M54,28
+            C39.6,28 28,38.1 28,50.6
+            C28,58.2 32.3,64.9 38.9,69
+            L37,80
+            L48.4,73.7
+            C50.2,74 52.1,74.2 54,74.2
+            C68.4,74.2 80,64.1 80,50.6
+            C80,38.1 68.4,28 54,28 Z" />
+    <!-- small "typing dots" accent, a nod to the messaging context -->
     <path
-        android:fillColor="#FF000000"
-        android:pathData="
-            M38,34
-            L70,34
-            C71.66,34 73,35.34 73,37
-            C73,38.66 71.66,40 70,40
-            L38,40
-            C36.34,40 35,38.66 35,37
-            C35,35.34 36.34,34 38,34
-            Z" />
-
-    <path
-        android:fillColor="#FF000000"
-        android:pathData="
-            M38,47
-            L62,47
-            C63.66,47 65,48.34 65,50
-            C65,51.66 63.66,53 62,53
-            L38,53
-            C36.34,53 35,51.66 35,50
-            C35,48.34 36.34,47 38,47
-            Z" />
-
+        android:fillColor="#0381FE"
+        android:pathData="M44,50 a3.2,3.2 0 1,0 6.4,0 a3.2,3.2 0 1,0 -6.4,0 Z
+                           M50.8,50 a3.2,3.2 0 1,0 6.4,0 a3.2,3.2 0 1,0 -6.4,0 Z
+                           M57.6,50 a3.2,3.2 0 1,0 6.4,0 a3.2,3.2 0 1,0 -6.4,0 Z" />
 </vector>

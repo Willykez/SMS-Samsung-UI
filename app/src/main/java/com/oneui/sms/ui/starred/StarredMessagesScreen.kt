@@ -1,3 +1,5 @@
+@file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+
 package com.oneui.sms.ui.starred
 
 import androidx.compose.foundation.clickable
