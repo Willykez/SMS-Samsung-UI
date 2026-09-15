@@ -10,6 +10,8 @@ import com.oneui.sms.data.local.AppDatabase
 import com.oneui.sms.data.local.ConversationEntity
 import com.oneui.sms.data.local.DeliveryStatus
 import com.oneui.sms.data.local.MessageEntity
+// (ConversationEntity already imported above; kept explicit for the new
+// recycle-bin / bulk-action methods added below.)
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.withContext
@@ -166,5 +168,122 @@ class SmsRepository(private val context: Context) {
         smsManager?.sendTextMessage(address, null, body, null, null)
 
         db.messageDao().updateStatus(pendingId, DeliveryStatus.SENT)
+    }
+
+    /** #1 — queues a message for later; the actual send is fired by ScheduledSendWorker. */
+    suspend fun scheduleMessage(threadId: Long, address: String, body: String, sendAt: Long) =
+        withContext(Dispatchers.IO) {
+            val id = -System.currentTimeMillis()
+            db.messageDao().upsert(
+                MessageEntity(
+                    id = id,
+                    threadId = threadId,
+                    address = address,
+                    body = body,
+                    timestamp = sendAt,
+                    isOutgoing = true,
+                    status = DeliveryStatus.SCHEDULED,
+                    scheduledAt = sendAt,
+                )
+            )
+            com.oneui.sms.worker.ScheduledSendWorker.enqueue(context, id, threadId, address, body, sendAt)
+            id
+        }
+
+    suspend fun cancelScheduled(messageId: Long) = withContext(Dispatchers.IO) {
+        com.oneui.sms.worker.ScheduledSendWorker.cancel(context, messageId)
+        db.messageDao().deleteHard(messageId)
+    }
+
+    // ---- #2 star ----
+    fun observeStarred(): Flow<List<MessageEntity>> = db.messageDao().observeStarred()
+    suspend fun setStarred(messageId: Long, starred: Boolean) = withContext(Dispatchers.IO) {
+        db.messageDao().setStarred(messageId, starred)
+    }
+
+    // ---- #9 recycle bin ----
+    fun observeDeletedMessages(): Flow<List<MessageEntity>> = db.messageDao().observeDeleted()
+    fun observeRecycleBinConversations(): Flow<List<ConversationEntity>> = db.conversationDao().observeRecycleBin()
+
+    suspend fun softDeleteMessage(messageId: Long) = withContext(Dispatchers.IO) {
+        db.messageDao().softDelete(messageId, System.currentTimeMillis())
+    }
+    suspend fun restoreMessage(messageId: Long) = withContext(Dispatchers.IO) {
+        db.messageDao().restore(messageId)
+    }
+    suspend fun softDeleteConversations(threadIds: List<Long>) = withContext(Dispatchers.IO) {
+        db.conversationDao().softDelete(threadIds, System.currentTimeMillis())
+    }
+    suspend fun restoreConversations(threadIds: List<Long>) = withContext(Dispatchers.IO) {
+        db.conversationDao().restore(threadIds)
+    }
+
+    /** Hard-purges anything soft-deleted more than [retentionDays] ago (default 30, per #9). */
+    suspend fun purgeRecycleBin(retentionDays: Int = 30) = withContext(Dispatchers.IO) {
+        val cutoff = System.currentTimeMillis() - retentionDays * 24L * 60 * 60 * 1000
+        db.messageDao().purgeDeletedBefore(cutoff)
+        db.conversationDao().purgeDeletedBefore(cutoff)
+    }
+
+    /** #11 — soft-deletes any message older than [retentionDays] into the recycle bin. */
+    suspend fun applyAutoDeleteRetention(retentionDays: Int) = withContext(Dispatchers.IO) {
+        val cutoff = System.currentTimeMillis() - retentionDays * 24L * 60 * 60 * 1000
+        db.messageDao().softDeleteOlderThan(cutoff, System.currentTimeMillis())
+    }
+
+    // ---- #10 unread filter / mark as read ----
+    fun observeUnreadOnly(): Flow<List<ConversationEntity>> = db.conversationDao().observeUnreadOnly()
+    suspend fun markRead(threadIds: List<Long>) = withContext(Dispatchers.IO) {
+        db.conversationDao().markRead(threadIds)
+    }
+    suspend fun markAllRead() = withContext(Dispatchers.IO) {
+        db.conversationDao().markAllRead()
+    }
+
+    // ---- #12 search within a thread ----
+    fun searchInThread(threadId: Long, query: String): Flow<List<MessageEntity>> =
+        db.messageDao().searchInThread(threadId, query)
+
+    // ---- #1 scheduled list ----
+    fun observeScheduled(): Flow<List<MessageEntity>> = db.messageDao().observeScheduled()
+
+    // ---- conversation-level bulk actions (multi-select bottom bar) ----
+    suspend fun setPinned(threadIds: List<Long>, pinned: Boolean) = withContext(Dispatchers.IO) {
+        db.conversationDao().setPinned(threadIds, pinned)
+    }
+    suspend fun setMuted(threadIds: List<Long>, muted: Boolean) = withContext(Dispatchers.IO) {
+        db.conversationDao().setMuted(threadIds, muted)
+    }
+    suspend fun setNotificationSound(threadId: Long, uri: String?) = withContext(Dispatchers.IO) {
+        db.conversationDao().setNotificationSound(threadId, uri)
+    }
+    suspend fun setChatColor(threadId: Long, hex: String?) = withContext(Dispatchers.IO) {
+        db.conversationDao().setChatColor(threadId, hex)
+    }
+
+    // ---- #3 reminders ----
+    fun observeReminders(): Flow<List<com.oneui.sms.data.local.ReminderEntity>> = db.reminderDao().observeAll()
+
+    suspend fun setReminder(messageId: Long, threadId: Long, remindAt: Long, note: String?) = withContext(Dispatchers.IO) {
+        val id = db.reminderDao().upsert(
+            com.oneui.sms.data.local.ReminderEntity(messageId = messageId, threadId = threadId, remindAt = remindAt, note = note)
+        )
+        com.oneui.sms.reminder.ReminderScheduler.schedule(context, id, messageId, threadId, remindAt, note)
+    }
+
+    suspend fun clearReminder(reminderId: Long, messageId: Long) = withContext(Dispatchers.IO) {
+        com.oneui.sms.reminder.ReminderScheduler.cancel(context, reminderId)
+        db.reminderDao().deleteForMessage(messageId)
+    }
+
+    // ---- new conversation / contact picker support ----
+    /**
+     * Resolves (or creates) the Telephony thread id for an address the way the
+     * system SMS app does — there's no thread until the first message exists,
+     * so Telephony.Threads.getOrCreateThreadId() is the correct entry point
+     * rather than inventing our own id scheme.
+     */
+    suspend fun getOrCreateThreadId(address: String): Long = withContext(Dispatchers.IO) {
+        Telephony.Threads.getOrCreateThreadId(context, setOf(address))
     }
 }

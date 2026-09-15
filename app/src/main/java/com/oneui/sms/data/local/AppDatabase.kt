@@ -16,14 +16,23 @@ class Converters {
 }
 
 @Database(
-    entities = [ConversationEntity::class, MessageEntity::class],
-    version = 1,
+    entities = [
+        ConversationEntity::class,
+        MessageEntity::class,
+        ReminderEntity::class,
+        QuickResponseEntity::class,
+        SettingsEntity::class,
+    ],
+    version = 2,
     exportSchema = false,
 )
 @TypeConverters(Converters::class)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun conversationDao(): ConversationDao
     abstract fun messageDao(): MessageDao
+    abstract fun reminderDao(): ReminderDao
+    abstract fun quickResponseDao(): QuickResponseDao
+    abstract fun settingsDao(): SettingsDao
 
     companion object {
         @Volatile private var instance: AppDatabase? = null
@@ -34,7 +43,11 @@ abstract class AppDatabase : RoomDatabase() {
                     context.applicationContext,
                     AppDatabase::class.java,
                     "onemessages.db",
-                ).build().also { instance = it }
+                )
+                    // Pre-release scaffold: destructive migration is fine until we
+                    // ship v1. Replace with real Migration objects before release.
+                    .fallbackToDestructiveMigration()
+                    .build().also { instance = it }
             }
     }
 }

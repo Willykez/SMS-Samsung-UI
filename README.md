@@ -48,23 +48,34 @@ receiver/      SMS_DELIVER receiver + required MMS/quick-reply stubs
 - Dynamic color (Material You) with a One UI–style blue fallback for
   pre-Android-12 devices.
 
-## Not yet built (next steps, roughly in priority order)
+## Feature coverage (see FEATURE_SPEC.md for the full mapping)
 
-1. **Permissions flow** — runtime request for `READ_SMS`/`SEND_SMS`/
-   `RECEIVE_SMS`/`READ_CONTACTS` (default-SMS-app role request is wired up in
-   `MainActivity`, but the runtime permission dialogs still need to be added
-   before first use).
-2. **Contact resolution** — `displayName` is currently null; needs a
-   `ContactsContract` lookup by phone number.
-3. **New conversation / contact picker** for the compose FAB.
-4. **Search** — the Room DAO already has a `search()` query; needs wiring to
-   a search UI in the collapsed header.
-5. **Dual-pane layout** for tablets/foldables (window-size-class breakpoint
-   at 600dp, per the report) — currently single-pane only.
-6. **Notifications** — heads-up notification with quick-reply `RemoteInput`
-   on incoming SMS (stub comment left in `SmsDeliverReceiver`).
-7. **Pin/mute/archive actions** — DAO methods exist; need to be wired to
-   swipe actions and a long-press context menu.
+All 15 Samsung Messages settings from the spec are now wired end-to-end
+(Room schema, repository methods, ViewModels, and screens):
+
+1. Schedule messages — composer "+" menu, `ScheduledSendWorker`, Scheduled messages list
+2. Star messages — long-press a bubble, "Starred messages" list
+3. Reminders — `ReminderEntity`, AlarmManager scheduling (`ReminderScheduler`), and a "Remind me…" long-press action on any message bubble
+4. Pin conversations to top — multi-select bottom bar (matches the reference screenshots)
+5. Mute conversations — multi-select bottom bar + per-thread mute in the thread's overflow menu
+6. Custom notification sound per contact — per-thread notification channel created on demand (`NotificationChannels.ensureConversationChannel`); **the ringtone-picker UI itself isn't hooked up yet** (needs `RingtoneManager.ACTION_RINGTONE_PICKER`, an Activity-level intent)
+7. Chat background/bubble color — thread overflow menu → color picker
+8. Font size — Settings screen slider, applied live to message bubbles
+9. Recycle bin (30-day soft delete) — conversation delete + message delete both route here; daily purge via `RetentionPurgeWorker`
+10. View unread only — filter icon in the conversation list header
+11. Auto-delete old messages — Settings screen, shares the same daily worker as #9
+12. Search within a chat thread — search icon in the thread's top bar
+13. Home screen widget/shortcut — **not yet built** (separate Android surface: `ShortcutManager` or a Glance widget)
+14. Quick responses — composer "+" menu → picker chips; managed from Settings
+15. Disable web link preview — Settings toggle; **the preview-card rendering itself isn't built yet** (the toggle just gates a feature that doesn't exist yet)
+
+### Genuinely not yet built
+- **Runtime permission dialogs** (READ_SMS/SEND_SMS/RECEIVE_SMS/READ_CONTACTS) — the default-SMS-app role request and the contact picker are both wired, but the runtime permission prompts still need to precede first use.
+- **Contact resolution** — `displayName` is still null; needs a `ContactsContract` lookup by phone number (same API already used in the new-conversation picker — just needs to run for every conversation row too).
+- **#6 notification-sound picker UI** — channel creation exists; needs the system ringtone picker intent + a way to change an already-created channel's sound (user must do that via system settings once a channel exists — Android limitation, not ours).
+- **#13 widget/shortcut** — separate Android surface (App Widget or pinned shortcut).
+- **#15 link preview cards** — needs a lightweight URL-metadata fetch + cache.
+- **Dual-pane tablet/fold layout** (600dp breakpoint) — currently single-pane only.
 
 ## Setup
 
