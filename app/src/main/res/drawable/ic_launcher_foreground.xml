@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Main message bubble -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="
+            M24,28
+            C24,21.37 29.37,16 36,16
+            L72,16
+            C78.63,16 84,21.37 84,28
+            L84,57
+            C84,63.63 78.63,69 72,69
+            L48,69
+            L34,82
+            L36,69
+            L36,69
+            C29.37,69 24,63.63 24,57
+            Z" />
+
+    <!-- Message lines -->
+    <path
+        android:fillColor="#FF000000"
+        android:pathData="
+            M38,34
+            L70,34
+            C71.66,34 73,35.34 73,37
+            C73,38.66 71.66,40 70,40
+            L38,40
+            C36.34,40 35,38.66 35,37
+            C35,35.34 36.34,34 38,34
+            Z" />
+
+    <path
+        android:fillColor="#FF000000"
+        android:pathData="
+            M38,47
+            L62,47
+            C63.66,47 65,48.34 65,50
+            C65,51.66 63.66,53 62,53
+            L38,53
+            C36.34,53 35,51.66 35,50
+            C35,48.34 36.34,47 38,47
+            Z" />
+
+</vector>
