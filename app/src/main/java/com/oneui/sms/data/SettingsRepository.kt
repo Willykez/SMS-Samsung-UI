@@ -28,6 +28,15 @@ class SettingsRepository(context: Context) {
     suspend fun setAutoDeleteDays(days: Int?) = update { it.copy(autoDeleteDays = days) }
     suspend fun setShowLinkPreviews(show: Boolean) = update { it.copy(showLinkPreviews = show) }
     suspend fun setFontScale(scale: Float) = update { it.copy(fontScale = scale) }
+    suspend fun setCategoriesEnabled(enabled: Boolean) = update { it.copy(categoriesEnabled = enabled) }
+    suspend fun setRemoveLocationFromSharedImages(remove: Boolean) = update { it.copy(removeLocationFromSharedImages = remove) }
+
+    // conversation categories (tab row)
+    fun observeCategories(): Flow<List<com.oneui.sms.data.local.CategoryEntity>> = db.categoryDao().observeAll()
+    suspend fun addCategory(name: String) = withContext(Dispatchers.IO) {
+        db.categoryDao().upsert(com.oneui.sms.data.local.CategoryEntity(name = name))
+    }
+    suspend fun deleteCategory(id: Long) = withContext(Dispatchers.IO) { db.categoryDao().delete(id) }
 
     // #14 quick responses
     fun observeQuickResponses(): Flow<List<QuickResponseEntity>> = db.quickResponseDao().observeAll()

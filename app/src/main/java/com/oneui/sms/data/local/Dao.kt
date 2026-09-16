@@ -15,6 +15,12 @@ interface ConversationDao {
     @Query("SELECT * FROM conversations WHERE isArchived = 0 AND deletedAt IS NULL AND unreadCount > 0 ORDER BY isPinned DESC, timestamp DESC")
     fun observeUnreadOnly(): Flow<List<ConversationEntity>> // #10
 
+    @Query("SELECT * FROM conversations WHERE isArchived = 0 AND deletedAt IS NULL AND category = :category ORDER BY isPinned DESC, timestamp DESC")
+    fun observeByCategory(category: String): Flow<List<ConversationEntity>>
+
+    @Query("UPDATE conversations SET category = :category WHERE threadId IN (:threadIds)")
+    suspend fun setCategory(threadIds: List<Long>, category: String?)
+
     @Query("SELECT * FROM conversations WHERE isArchived = 1 AND deletedAt IS NULL ORDER BY timestamp DESC")
     fun observeArchived(): Flow<List<ConversationEntity>>
 
@@ -138,6 +144,18 @@ interface QuickResponseDao {
     suspend fun upsert(response: QuickResponseEntity): Long
 
     @Query("DELETE FROM quick_responses WHERE id = :id")
+    suspend fun delete(id: Long)
+}
+
+@Dao
+interface CategoryDao {
+    @Query("SELECT * FROM categories ORDER BY sortOrder ASC, id ASC")
+    fun observeAll(): Flow<List<CategoryEntity>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsert(category: CategoryEntity): Long
+
+    @Query("DELETE FROM categories WHERE id = :id")
     suspend fun delete(id: Long)
 }
 

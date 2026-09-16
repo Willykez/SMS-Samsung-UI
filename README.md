@@ -48,6 +48,39 @@ receiver/      SMS_DELIVER receiver + required MMS/quick-reply stubs
 - Dynamic color (Material You) with a One UI–style blue fallback for
   pre-Android-12 devices.
 
+## Visual design pass (matched against reference Samsung Messages screenshots)
+
+The first build matched feature *logic* but used generic Material 3
+defaults instead of the actual One UI visual language. This pass pulled
+concrete details from reference screenshots:
+
+- **Category tabs** (All / Personal / Shipping / OTP / custom, with "+" to
+  add) on the inbox, backed by a real `CategoryEntity` table
+- **Bottom Conversations/Contacts nav** with an unread-count badge, FAB
+  restyled to a chat-bubble icon anchored above it
+- **Exact overflow-menu order**: Delete / Mark all as read / Edit
+  categories / Reorder pinned / Starred messages / Scheduled messages /
+  Recycle bin / Settings
+- **Dedicated Unread messages screen** (back arrow + list), not just an
+  inline filter toggle
+- **Edit categories screen** — On/Off toggle, "+ Add category" row, add
+  dialog — matches the reference flow
+- **Settings restructured into grouped cards** matching the reference
+  copy verbatim (including "Keep deleted messages for 30 days.", the
+  "More settings" row list with Push messages/Broadcast channels labels, etc.)
+- **Contacts tab** — real device-contacts list, tapping one opens/creates a thread
+- Light theme background switched to the lavender-tinted grey the
+  screenshots use instead of pure white
+
+**Honest scope note**: several Settings rows shown in the reference
+(Chat settings, Notifications, Block numbers and spam, Emergency alert
+history, About Messages, Text/Multimedia messages, Push messages,
+Broadcast channels) are wired to a `StubScreen` — present and
+navigable for visual/structural completeness, but with no real
+functionality behind them, since they're outside this app's SMS-only
+feature scope. "Reorder pinned" similarly shows a "coming soon"
+snackbar rather than actual drag-to-reorder.
+
 ## Feature coverage (see FEATURE_SPEC.md for the full mapping)
 
 All 15 Samsung Messages settings from the spec are now wired end-to-end

@@ -6,6 +6,7 @@ import android.content.Intent
 import android.os.Build
 import android.os.Bundle
 import android.provider.Telephony
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -16,6 +17,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.getValue
@@ -27,14 +29,33 @@ import androidx.compose.ui.unit.dp
 import com.oneui.sms.ui.navigation.OneMessagesNavHost
 import com.oneui.sms.ui.theme.OneMessagesTheme
 
+private const val TAG = "DefaultSmsCheck"
+
 class MainActivity : ComponentActivity() {
 
     // Held at the Activity level (not inside a remember{} in setContent) so
     // onResume() can push a fresh value into the same state the UI reads.
     private val isDefaultSmsState = mutableStateOf(false)
+    // Shown on-screen (not just logcat) so this is debuggable from a screenshot alone.
+    private val debugInfoState = mutableStateOf("")
 
-    private fun isDefaultSmsApp(): Boolean =
-        Telephony.Sms.getDefaultSmsPackage(this) == packageName
+    private fun isDefaultSmsApp(): Boolean {
+        val currentDefault = Telephony.Sms.getDefaultSmsPackage(this)
+        val matches = currentDefault == packageName
+        val roleAvailable = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            (getSystemService(Context.ROLE_SERVICE) as RoleManager).isRoleAvailable(RoleManager.ROLE_SMS)
+        } else null
+        val roleHeld = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            (getSystemService(Context.ROLE_SERVICE) as RoleManager).isRoleHeld(RoleManager.ROLE_SMS)
+        } else null
+        val info = "our package: $packageName\n" +
+            "system default: $currentDefault\n" +
+            "match: $matches\n" +
+            "ROLE_SMS available: $roleAvailable, held: $roleHeld"
+        Log.d(TAG, info.replace("\n", " | "))
+        debugInfoState.value = info
+        return matches
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -44,6 +65,7 @@ class MainActivity : ComponentActivity() {
             OneMessagesTheme {
                 Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
                     val isDefault by isDefaultSmsState
+                    val debugInfo by debugInfoState
 
                     val roleLauncher = rememberLauncherForActivityResult(
                         ActivityResultContracts.StartActivityForResult(),
@@ -52,7 +74,11 @@ class MainActivity : ComponentActivity() {
                     if (isDefault) {
                         OneMessagesNavHost()
                     } else {
-                        DefaultSmsAppPrompt(onRequest = { requestDefaultSmsRole(roleLauncher) })
+                        DefaultSmsAppPrompt(
+                            debugInfo = debugInfo,
+                            onRequest = { requestDefaultSmsRole(roleLauncher) },
+                            onCheckAgain = { isDefaultSmsState.value = isDefaultSmsApp() },
+                        )
                     }
                 }
             }
@@ -61,11 +87,6 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
-        // The reliable re-check: onResume() fires *after* the default-SMS
-        // dialog/chooser fully closes and the system has committed the role
-        // change, whereas the ActivityResult callback can race the system's
-        // own registry update (Telephony.Sms.getDefaultSmsPackage lagging
-        // behind the actual grant by a beat on some Android builds).
         isDefaultSmsState.value = isDefaultSmsApp()
     }
 
@@ -86,7 +107,7 @@ class MainActivity : ComponentActivity() {
 }
 
 @androidx.compose.runtime.Composable
-private fun DefaultSmsAppPrompt(onRequest: () -> Unit) {
+private fun DefaultSmsAppPrompt(debugInfo: String, onRequest: () -> Unit, onCheckAgain: () -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -102,5 +123,12 @@ private fun DefaultSmsAppPrompt(onRequest: () -> Unit) {
         Button(onClick = onRequest) {
             Text("Set as default SMS app")
         }
+        androidx.compose.foundation.layout.Spacer(Modifier.padding(8.dp))
+        OutlinedButton(onClick = onCheckAgain) {
+            Text("Already set it — check again")
+        }
+        androidx.compose.foundation.layout.Spacer(Modifier.padding(20.dp))
+        // Temporary on-screen diagnostics — remove once this is confirmed working.
+        Text(debugInfo, style = MaterialTheme.typography.labelSmall)
     }
 }

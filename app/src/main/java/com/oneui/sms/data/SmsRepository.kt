@@ -261,6 +261,12 @@ class SmsRepository(private val context: Context) {
         db.conversationDao().setChatColor(threadId, hex)
     }
 
+    fun observeByCategory(category: String): Flow<List<ConversationEntity>> = db.conversationDao().observeByCategory(category)
+
+    suspend fun setCategory(threadIds: List<Long>, category: String?) = withContext(Dispatchers.IO) {
+        db.conversationDao().setCategory(threadIds, category)
+    }
+
     // ---- #3 reminders ----
     fun observeReminders(): Flow<List<com.oneui.sms.data.local.ReminderEntity>> = db.reminderDao().observeAll()
 

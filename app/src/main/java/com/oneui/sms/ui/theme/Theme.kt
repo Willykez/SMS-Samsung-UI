@@ -20,6 +20,7 @@ private val LightColors = lightColorScheme(
     surfaceVariant = SurfaceDim,
     onBackground = TextPrimaryLight,
     onSurface = TextPrimaryLight,
+    surfaceContainer = CardLight, // grouped-settings cards
 )
 
 private val DarkColors = darkColorScheme(

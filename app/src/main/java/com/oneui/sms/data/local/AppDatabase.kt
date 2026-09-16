@@ -22,8 +22,9 @@ class Converters {
         ReminderEntity::class,
         QuickResponseEntity::class,
         SettingsEntity::class,
+        CategoryEntity::class,
     ],
-    version = 2,
+    version = 3,
     exportSchema = false,
 )
 @TypeConverters(Converters::class)
@@ -33,6 +34,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun reminderDao(): ReminderDao
     abstract fun quickResponseDao(): QuickResponseDao
     abstract fun settingsDao(): SettingsDao
+    abstract fun categoryDao(): CategoryDao
 
     companion object {
         @Volatile private var instance: AppDatabase? = null

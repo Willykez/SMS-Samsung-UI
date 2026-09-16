@@ -58,6 +58,14 @@ data class QuickResponseEntity(
     val text: String,
 )
 
+/** Conversation categories (All / Personal / Shipping / OTP / custom) — the tab row on the inbox. */
+@Entity(tableName = "categories")
+data class CategoryEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val name: String,
+    val sortOrder: Int = 0,
+)
+
 /** Single-row table (id is always 0) holding the global toggles from Settings. */
 @Entity(tableName = "settings")
 data class SettingsEntity(
@@ -66,4 +74,6 @@ data class SettingsEntity(
     val autoDeleteDays: Int? = null,             // #11 — null = never
     val showLinkPreviews: Boolean = true,         // #15
     val fontScale: Float = 1.0f,                  // #8
+    val categoriesEnabled: Boolean = true,        // conversation categories on/off
+    val removeLocationFromSharedImages: Boolean = false,
 )

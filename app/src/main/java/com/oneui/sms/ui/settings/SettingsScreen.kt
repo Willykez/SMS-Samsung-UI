@@ -2,6 +2,7 @@
 
 package com.oneui.sms.ui.settings
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -10,9 +11,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material3.Card
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
@@ -47,111 +48,178 @@ class SettingsViewModel(private val repository: SettingsRepository) : ViewModel(
     fun setAutoDeleteDays(days: Int?) = viewModelScope.launch { repository.setAutoDeleteDays(days) }
     fun setShowLinkPreviews(show: Boolean) = viewModelScope.launch { repository.setShowLinkPreviews(show) }
     fun setFontScale(scale: Float) = viewModelScope.launch { repository.setFontScale(scale) }
+    fun setCategoriesEnabled(enabled: Boolean) = viewModelScope.launch { repository.setCategoriesEnabled(enabled) }
+    fun setRemoveLocationFromSharedImages(remove: Boolean) = viewModelScope.launch { repository.setRemoveLocationFromSharedImages(remove) }
 }
 
-private val AUTO_DELETE_OPTIONS = listOf(null, 30, 90, 365) // #11: Never / 30d / 90d / 1yr
+private val AUTO_DELETE_OPTIONS = listOf(null, 30, 90, 365)
 
-@OptIn(ExperimentalMaterial3Api::class)
+/** Top-level "Messages settings" screen — grouped cards match the reference exactly. */
 @Composable
 fun SettingsScreen(
     settings: SettingsEntity,
     onBack: () -> Unit,
-    onOpenQuickResponses: () -> Unit,
+    onOpenStub: (String) -> Unit,
+    onOpenMoreSettings: () -> Unit,
     onSetRecycleBinEnabled: (Boolean) -> Unit,
-    onSetAutoDeleteDays: (Int?) -> Unit,
-    onSetShowLinkPreviews: (Boolean) -> Unit,
-    onSetFontScale: (Float) -> Unit,
+    onSetCategoriesEnabled: (Boolean) -> Unit,
 ) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Settings") },
+                title = { Text("Messages settings") },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                    }
+                    IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back") }
                 },
             )
         },
     ) { padding ->
-        Column(Modifier.fillMaxSize().padding(padding)) {
-
-            ListItem(
-                headlineContent = { Text("Quick responses") }, // #14
-                supportingContent = { Text("Manage your pre-written replies") },
-                modifier = Modifier.fillMaxWidth(),
-                trailingContent = {
-                    TextButton(onClick = onOpenQuickResponses) { Text("Edit") }
-                },
-            )
-
-            ListItem(
-                headlineContent = { Text("Recycle bin") }, // #9
-                supportingContent = { Text("Keep deleted messages for 30 days before permanent removal") },
-                trailingContent = {
-                    Switch(checked = settings.recycleBinEnabled, onCheckedChange = onSetRecycleBinEnabled)
-                },
-            )
-
-            AutoDeleteRow(currentDays = settings.autoDeleteDays, onSelect = onSetAutoDeleteDays) // #11
-
-            ListItem(
-                headlineContent = { Text("Preview web links from contacts") }, // #15
-                trailingContent = {
-                    Switch(checked = settings.showLinkPreviews, onCheckedChange = onSetShowLinkPreviews)
-                },
-            )
-
-            FontScaleRow(currentScale = settings.fontScale, onChange = onSetFontScale) // #8
+        Column(Modifier.fillMaxSize().padding(padding).padding(horizontal = 16.dp, vertical = 8.dp)) {
+            SettingsGroup {
+                SettingsRow(title = "Chat settings", onClick = { onOpenStub("Chat settings") })
+            }
+            Spacer12()
+            SettingsGroup {
+                SettingsRow(
+                    title = "Conversation categories",
+                    trailing = { Switch(checked = settings.categoriesEnabled, onCheckedChange = onSetCategoriesEnabled) },
+                )
+                Divider()
+                SettingsRow(
+                    title = "Recycle bin",
+                    subtitle = "Keep deleted messages for 30 days.",
+                    trailing = { Switch(checked = settings.recycleBinEnabled, onCheckedChange = onSetRecycleBinEnabled) },
+                )
+            }
+            Spacer12()
+            SettingsGroup {
+                SettingsRow(title = "Notifications", onClick = { onOpenStub("Notifications") })
+                Divider()
+                SettingsRow(title = "Block numbers and spam", onClick = { onOpenStub("Block numbers and spam") })
+                Divider()
+                SettingsRow(title = "More settings", onClick = onOpenMoreSettings)
+                Divider()
+                SettingsRow(title = "Emergency alert history", onClick = { onOpenStub("Emergency alert history") })
+            }
+            Spacer12()
+            SettingsGroup {
+                SettingsRow(title = "About Messages", onClick = { onOpenStub("About Messages") })
+            }
         }
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+/** Secondary "More settings" screen — copy matches the reference exactly. */
+@Composable
+fun MoreSettingsScreen(
+    settings: SettingsEntity,
+    onBack: () -> Unit,
+    onOpenStub: (String) -> Unit,
+    onOpenQuickResponses: () -> Unit,
+    onSetShowLinkPreviews: (Boolean) -> Unit,
+    onSetRemoveLocation: (Boolean) -> Unit,
+    onSetAutoDeleteDays: (Int?) -> Unit,
+) {
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("More settings") },
+                navigationIcon = {
+                    IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back") }
+                },
+            )
+        },
+    ) { padding ->
+        Column(Modifier.fillMaxSize().padding(padding).padding(horizontal = 16.dp, vertical = 8.dp)) {
+            SettingsGroup {
+                SettingsRow(title = "Text messages", onClick = { onOpenStub("Text messages") })
+                Divider()
+                SettingsRow(title = "Multimedia messages", onClick = { onOpenStub("Multimedia messages") })
+            }
+            Spacer12()
+            SettingsGroup {
+                SettingsRow(title = "Quick responses", onClick = onOpenQuickResponses)
+                Divider()
+                SettingsRow(title = "Push messages", subtitle = "Prompt", subtitleIsLink = true, onClick = { onOpenStub("Push messages") })
+                Divider()
+                SettingsRow(title = "Broadcast channels", subtitle = "Off", subtitleIsLink = true, onClick = { onOpenStub("Broadcast channels") })
+                Divider()
+                SettingsRow(
+                    title = "Preview web links from contacts",
+                    trailing = { Switch(checked = settings.showLinkPreviews, onCheckedChange = onSetShowLinkPreviews) },
+                )
+                Divider()
+                SettingsRow(
+                    title = "Remove location from shared images",
+                    trailing = { Switch(checked = settings.removeLocationFromSharedImages, onCheckedChange = onSetRemoveLocation) },
+                )
+                Divider()
+                AutoDeleteRow(currentDays = settings.autoDeleteDays, onSelect = onSetAutoDeleteDays)
+            }
+        }
+    }
+}
+
 @Composable
 private fun AutoDeleteRow(currentDays: Int?, onSelect: (Int?) -> Unit) {
     var menuOpen by remember { mutableStateOf(false) }
-    val label = when (currentDays) {
-        null -> "Never"
-        30 -> "After 30 days"
-        90 -> "After 90 days"
-        365 -> "After 1 year"
-        else -> "After $currentDays days"
-    }
-
-    ListItem(
-        headlineContent = { Text("Delete old messages") },
-        supportingContent = { Text(label) },
-        modifier = Modifier.fillMaxWidth(),
-        trailingContent = {
-            androidx.compose.foundation.layout.Box {
-                TextButton(onClick = { menuOpen = true }) { Text("Change") }
-                DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
-                    AUTO_DELETE_OPTIONS.forEach { days ->
-                        DropdownMenuItem(
-                            text = { Text(if (days == null) "Never" else "After $days days") },
-                            onClick = { menuOpen = false; onSelect(days) },
-                        )
+    Column {
+        SettingsRow(
+            title = "Delete old messages",
+            subtitle = "Delete your oldest messages to make room for new ones — configurable retention window",
+            trailing = {
+                androidx.compose.foundation.layout.Box {
+                    Switch(checked = currentDays != null, onCheckedChange = { menuOpen = true })
+                    DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                        AUTO_DELETE_OPTIONS.forEach { days ->
+                            DropdownMenuItem(
+                                text = { Text(if (days == null) "Never" else "After $days days") },
+                                onClick = { menuOpen = false; onSelect(days) },
+                            )
+                        }
                     }
                 }
+            },
+        )
+    }
+}
+
+@Composable
+private fun SettingsGroup(content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit) {
+    Card(shape = MaterialTheme.shapes.large) {
+        Column(content = content)
+    }
+}
+
+@Composable
+private fun SettingsRow(
+    title: String,
+    subtitle: String? = null,
+    subtitleIsLink: Boolean = false,
+    trailing: (@Composable () -> Unit)? = null,
+    onClick: (() -> Unit)? = null,
+) {
+    ListItem(
+        modifier = if (onClick != null) Modifier.fillMaxWidth().clickable(onClick = onClick) else Modifier.fillMaxWidth(),
+        headlineContent = { Text(title) },
+        supportingContent = subtitle?.let {
+            {
+                Text(
+                    it,
+                    color = if (subtitleIsLink) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
         },
+        trailingContent = trailing,
     )
 }
 
 @Composable
-private fun FontScaleRow(currentScale: Float, onChange: (Float) -> Unit) {
-    Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
-        Text("Message text size", style = MaterialTheme.typography.bodyLarge)
-        Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-            Text("A", style = MaterialTheme.typography.labelSmall)
-            Slider(
-                value = currentScale,
-                onValueChange = onChange,
-                valueRange = 0.85f..1.5f,
-                modifier = Modifier.weight(1f).padding(horizontal = 8.dp),
-            )
-            Text("A", style = MaterialTheme.typography.headlineSmall)
-        }
-    }
+private fun Divider() {
+    androidx.compose.material3.HorizontalDivider(modifier = Modifier.padding(start = 16.dp))
+}
+
+@Composable
+private fun Spacer12() {
+    androidx.compose.foundation.layout.Spacer(Modifier.padding(top = 6.dp))
 }

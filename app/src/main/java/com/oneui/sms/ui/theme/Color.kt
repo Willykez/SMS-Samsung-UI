@@ -7,8 +7,9 @@ import androidx.compose.ui.graphics.Color
 val OneUIBlue = Color(0xFF0381FE)
 val OneUIBlueDark = Color(0xFF4DA3FF)
 
-val SurfaceLight = Color(0xFFFFFFFF)
-val SurfaceDim = Color(0xFFF2F2F2)
+val SurfaceLight = Color(0xFFF7F6FB) // One UI's light lavender-tinted page background
+val SurfaceDim = Color(0xFFEDEBF5)
+val CardLight = Color(0xFFFFFFFF) // grouped-settings card surface sits on top of SurfaceLight
 val SurfaceDark = Color(0xFF121212)
 val SurfaceDimDark = Color(0xFF1C1C1E)
 
