@@ -20,7 +20,6 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -30,19 +29,25 @@ import com.oneui.sms.ui.theme.OneMessagesTheme
 
 class MainActivity : ComponentActivity() {
 
+    // Held at the Activity level (not inside a remember{} in setContent) so
+    // onResume() can push a fresh value into the same state the UI reads.
+    private val isDefaultSmsState = mutableStateOf(false)
+
     private fun isDefaultSmsApp(): Boolean =
         Telephony.Sms.getDefaultSmsPackage(this) == packageName
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        isDefaultSmsState.value = isDefaultSmsApp()
+
         setContent {
             OneMessagesTheme {
                 Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-                    var isDefault by remember { mutableStateOf(isDefaultSmsApp()) }
+                    val isDefault by isDefaultSmsState
 
                     val roleLauncher = rememberLauncherForActivityResult(
                         ActivityResultContracts.StartActivityForResult(),
-                    ) { isDefault = isDefaultSmsApp() }
+                    ) { isDefaultSmsState.value = isDefaultSmsApp() }
 
                     if (isDefault) {
                         OneMessagesNavHost()
@@ -52,6 +57,16 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // The reliable re-check: onResume() fires *after* the default-SMS
+        // dialog/chooser fully closes and the system has committed the role
+        // change, whereas the ActivityResult callback can race the system's
+        // own registry update (Telephony.Sms.getDefaultSmsPackage lagging
+        // behind the actual grant by a beat on some Android builds).
+        isDefaultSmsState.value = isDefaultSmsApp()
     }
 
     private fun requestDefaultSmsRole(
