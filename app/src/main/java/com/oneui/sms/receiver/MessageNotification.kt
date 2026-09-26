@@ -10,6 +10,10 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.RemoteInput
 import com.oneui.sms.MainActivity
 import com.oneui.sms.R
+import com.oneui.sms.data.SmsRepository
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 object MessageNotification {
     const val CHANNEL = "messages"
@@ -19,26 +23,48 @@ object MessageNotification {
     fun ensureChannel(context: Context) {
         if (Build.VERSION.SDK_INT >= 26) {
             val manager = context.getSystemService(NotificationManager::class.java)
-            manager.createNotificationChannel(NotificationChannel(CHANNEL, "Messages", NotificationManager.IMPORTANCE_HIGH).apply {
-                description = "Incoming SMS notifications"
-            })
+            manager.createNotificationChannel(
+                NotificationChannel(CHANNEL, "Messages", NotificationManager.IMPORTANCE_HIGH).apply {
+                    description = "Incoming SMS notifications"
+                }
+            )
         }
     }
 
-    fun show(context: Context, address: String, body: String, threadId: Long, muted: Boolean = false, withReply: Boolean = true, withSound: Boolean = true, withVibration: Boolean = true) {
+    fun show(
+        context: Context, 
+        address: String, 
+        body: String, 
+        threadId: Long, 
+        muted: Boolean = false, 
+        withReply: Boolean = true, 
+        withSound: Boolean = true, 
+        withVibration: Boolean = true
+    ) {
         ensureChannel(context)
         val openIntent = Intent(context, MainActivity::class.java).apply {
             putExtra("openThreadId", threadId)
             putExtra("openAddress", address)
         }
-        val open = PendingIntent.getActivity(context, threadId.hashCode(), openIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+        val open = PendingIntent.getActivity(
+            context, 
+            threadId.hashCode(), 
+            openIntent, 
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
         val reply = RemoteInput.Builder(REPLY_KEY).setLabel("Reply").build()
         val replyIntent = PendingIntent.getBroadcast(
-            context, (threadId.hashCode() xor 0x44),
-            Intent(context, NotificationReplyReceiver::class.java).putExtra("address", address).putExtra("threadId", threadId),
+            context, 
+            (threadId.hashCode() xor 0x44),
+            Intent(context, NotificationReplyReceiver::class.java)
+                .putExtra("address", address)
+                .putExtra("threadId", threadId),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE,
         )
-        val replyAction = NotificationCompat.Action.Builder(0, "Reply", replyIntent).addRemoteInput(reply).build()
+        val replyAction = NotificationCompat.Action.Builder(0, "Reply", replyIntent)
+            .addRemoteInput(reply)
+            .build()
+            
         val builder = NotificationCompat.Builder(context, CHANNEL)
             .setSmallIcon(R.drawable.ic_launcher_foreground)
             .setContentTitle(address)
@@ -49,8 +75,10 @@ object MessageNotification {
             .setGroup(GROUP)
             .setCategory(NotificationCompat.CATEGORY_MESSAGE)
             .also { if (withReply) it.addAction(replyAction) }
+            
         if (muted || !withSound) builder.setSilent(true)
         if (!withVibration) builder.setVibrate(longArrayOf(0L))
+        
         context.getSystemService(NotificationManager::class.java).notify(threadId.hashCode(), builder.build())
     }
 }
@@ -59,10 +87,16 @@ class NotificationReplyReceiver : android.content.BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val address = intent.getStringExtra("address") ?: return
         val threadId = intent.getLongExtra("threadId", -1L)
-        val reply = androidx.core.app.RemoteInput.getResultsFromIntent(intent)?.getCharSequence(MessageNotification.REPLY_KEY)?.toString()?.trim() ?: return
+        val reply = RemoteInput.getResultsFromIntent(intent)
+            ?.getCharSequence(MessageNotification.REPLY_KEY)
+            ?.toString()
+            ?.trim() ?: return
+            
         if (threadId < 0 || reply.isEmpty()) return
-        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
-            com.oneui.sms.data.SmsRepository(context.applicationContext).sendMessage(threadId, address, reply)
+        
+        // ✅ FIXED: Proper imports allow 'launch' to be resolved as a CoroutineScope extension function
+        CoroutineScope(Dispatchers.IO).launch {
+            SmsRepository(context.applicationContext).sendMessage(threadId, address, reply)
         }
     }
 }
