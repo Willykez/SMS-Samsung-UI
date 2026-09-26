@@ -2,9 +2,6 @@
 
 package com.oneui.sms.ui.scheduled
 
-import android.text.format.DateFormat
-import androidx.picker.app.SeslDatePickerDialog
-import androidx.picker.app.SeslTimePickerDialog
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -42,6 +39,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.oneui.sms.data.SmsRepository
 import com.oneui.sms.ui.theme.OneUiSectionCard
+import com.oneui.sms.ui.theme.OneUiDateTimePickerDialog
 import com.oneui.sms.ui.theme.OneUiTokens
 import com.oneui.sms.data.local.MessageEntity
 import kotlinx.coroutines.flow.SharingStarted
@@ -138,64 +136,14 @@ fun ScheduledMessagesScreen(
         }
     }
     editing?.let { msg ->
-        AlertDialog(
-            onDismissRequest = { editing = null },
-            title = { Text("Reschedule message") },
-            text = { Text("Choose a new send date and time.") },
-            confirmButton = {
-                TextButton(onClick = {
-                    openOneUiDateTimePicker(
-                        context = context,
-                        initialAt = msg.scheduledAt ?: System.currentTimeMillis(),
-                    ) { selectedAt ->
-                        onReschedule(msg, selectedAt)
-                        editing = null
-                    }
-                }) {
-                    Text("Choose time")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { editing = null }) {
-                    Text("Cancel")
-                }
+        OneUiDateTimePickerDialog(
+            initialAt = msg.scheduledAt ?: System.currentTimeMillis(),
+            onDismiss = { editing = null },
+            onPicked = { selectedAt ->
+                onReschedule(msg, selectedAt)
+                editing = null
             },
         )
     }
 }
 
-private fun openOneUiDateTimePicker(
-    context: android.content.Context,
-    initialAt: Long,
-    onPicked: (Long) -> Unit,
-) {
-    val initial = java.util.Calendar.getInstance().apply { timeInMillis = initialAt }
-    SeslDatePickerDialog(
-        context,
-        { _, year, month, day ->
-            val chosen = java.util.Calendar.getInstance().apply {
-                timeInMillis = initial.timeInMillis
-                set(java.util.Calendar.YEAR, year)
-                set(java.util.Calendar.MONTH, month)
-                set(java.util.Calendar.DAY_OF_MONTH, day)
-            }
-            SeslTimePickerDialog(
-                context,
-                { _, hour, minute ->
-                    chosen.set(java.util.Calendar.HOUR_OF_DAY, hour)
-                    chosen.set(java.util.Calendar.MINUTE, minute)
-                    chosen.set(java.util.Calendar.SECOND, 0)
-                    chosen.set(java.util.Calendar.MILLISECOND, 0)
-                    val selected = chosen.timeInMillis
-                    if (selected > System.currentTimeMillis()) onPicked(selected)
-                },
-                chosen.get(java.util.Calendar.HOUR_OF_DAY),
-                chosen.get(java.util.Calendar.MINUTE),
-                DateFormat.is24HourFormat(context)
-            ).show()
-        },
-        initial.get(java.util.Calendar.YEAR),
-        initial.get(java.util.Calendar.MONTH),
-        initial.get(java.util.Calendar.DAY_OF_MONTH)
-    ).show()
-}

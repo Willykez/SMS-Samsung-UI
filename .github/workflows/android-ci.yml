@@ -57,3 +57,14 @@ jobs:
           path: app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
           retention-days: 14
+      - name: Verify AndroidX dependency alignment
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./gradlew :app:dependencies --configuration debugCompileClasspath --no-daemon > /tmp/dependencies.txt
+          if grep -q "io.github.oneuiproject.sesl" /tmp/dependencies.txt; then
+            echo "SESL forked AndroidX artifacts must not be on the Compose app classpath." >&2
+            exit 1
+          fi
+          grep -q "androidx.core:core-ktx:1.13.1" /tmp/dependencies.txt
+

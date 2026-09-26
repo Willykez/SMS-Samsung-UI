@@ -8,7 +8,6 @@ package com.oneui.sms.ui.thread
 import android.content.Intent
 import android.graphics.BitmapFactory
 import android.net.Uri
-import android.text.format.DateFormat
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.animateDpAsState
@@ -106,8 +105,7 @@ import androidx.compose.ui.unit.sp
 import com.oneui.sms.data.local.DeliveryStatus
 import com.oneui.sms.data.local.MessageEntity
 import com.oneui.sms.data.local.QuickResponseEntity
-import androidx.picker.app.SeslDatePickerDialog
-import androidx.picker.app.SeslTimePickerDialog
+import com.oneui.sms.ui.theme.OneUiDateTimePickerDialog
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -149,6 +147,7 @@ fun MessageThreadScreen(
     var showColorPicker by remember { mutableStateOf(false) }
     var showProfile by remember { mutableStateOf(false) }
     var infoMessage by remember { mutableStateOf<MessageEntity?>(null) }
+    var showSchedulePicker by remember { mutableStateOf(false) }
 
     val context = LocalContext.current
     val density = LocalDensity.current
@@ -248,42 +247,7 @@ fun MessageThreadScreen(
                     keyboard?.show()
                 },
                 onQuick = { showQuickResponses = !showQuickResponses },
-                onSchedule = {
-                    val calendar = java.util.Calendar.getInstance().apply {
-                        timeInMillis = pendingScheduleTime ?: (System.currentTimeMillis() + 60 * 60_000L)
-                    }
-                    val dateDialog = SeslDatePickerDialog(
-                        context,
-                        { _, year, month, day ->
-                            val chosenDate = java.util.Calendar.getInstance().apply {
-                                timeInMillis = calendar.timeInMillis
-                                set(java.util.Calendar.YEAR, year)
-                                set(java.util.Calendar.MONTH, month)
-                                set(java.util.Calendar.DAY_OF_MONTH, day)
-                            }
-                            SeslTimePickerDialog(
-                                context,
-                                { _, hour, minute ->
-                                    chosenDate.set(java.util.Calendar.HOUR_OF_DAY, hour)
-                                    chosenDate.set(java.util.Calendar.MINUTE, minute)
-                                    chosenDate.set(java.util.Calendar.SECOND, 0)
-                                    chosenDate.set(java.util.Calendar.MILLISECOND, 0)
-                                    val sendAt = chosenDate.timeInMillis
-                                    onSetScheduleTime(
-                                        if (sendAt > System.currentTimeMillis()) sendAt else null
-                                    )
-                                },
-                                chosenDate.get(java.util.Calendar.HOUR_OF_DAY),
-                                chosenDate.get(java.util.Calendar.MINUTE),
-                                DateFormat.is24HourFormat(context),
-                            ).show()
-                        },
-                        calendar.get(java.util.Calendar.YEAR),
-                        calendar.get(java.util.Calendar.MONTH),
-                        calendar.get(java.util.Calendar.DAY_OF_MONTH),
-                    )
-                    dateDialog.show()
-                },
+                onSchedule = { showSchedulePicker = true },
                 onClearSchedule = { onSetScheduleTime(null) },
                 onPickQuickResponse = {
                     onPickQuickResponse(it)
@@ -343,6 +307,17 @@ fun MessageThreadScreen(
             }
 
         }
+    }
+
+    if (showSchedulePicker) {
+        OneUiDateTimePickerDialog(
+            initialAt = pendingScheduleTime ?: (System.currentTimeMillis() + 60 * 60_000L),
+            onDismiss = { showSchedulePicker = false },
+            onPicked = { selectedAt ->
+                onSetScheduleTime(selectedAt)
+                showSchedulePicker = false
+            },
+        )
     }
 
     if (showColorPicker) {

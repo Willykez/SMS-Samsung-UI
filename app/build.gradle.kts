@@ -12,8 +12,8 @@ android {
         applicationId = "com.oneui.sms"
         minSdk = 26 // required realistically for default-SMS-app role APIs used here
         targetSdk = 35
-        versionCode = 8
-        versionName = "0.8.0"
+        versionCode = 9
+        versionName = "0.9.0"
     }
 
     buildFeatures {
@@ -28,12 +28,6 @@ android {
     }
     kotlinOptions {
         jvmTarget = "17"
-    }
-
-    packaging {
-        resources {
-            excludes += "META-INF/androidx.appcompat_appcompat.version"
-        }
     }
 
     buildTypes {
@@ -51,27 +45,11 @@ android {
     }
 }
 
-// The SESL/One UI libraries intentionally fork several AndroidX modules while
-// keeping the original androidx.* package names. Keeping the stock and SESL
-// copies together produces duplicate classes. We keep the SESL fork for the
-// modules it replaces and retain official AndroidX for the rest of the stack.
-configurations.configureEach {
-    exclude(group = "androidx.core", module = "core")
-    exclude(group = "androidx.appcompat", module = "appcompat")
-    exclude(group = "androidx.fragment", module = "fragment")
-    exclude(group = "androidx.viewpager", module = "viewpager")
-    exclude(group = "androidx.drawerlayout", module = "drawerlayout")
-    exclude(group = "androidx.customview", module = "customview")
-    exclude(group = "androidx.recyclerview", module = "recyclerview")
-    exclude(group = "androidx.coordinatorlayout", module = "coordinatorlayout")
-    exclude(group = "androidx.swiperefreshlayout", module = "swiperefreshlayout")
-    exclude(group = "androidx.preference", module = "preference")
-}
-
 dependencies {
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.4")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.4")
     implementation("androidx.activity:activity-compose:1.9.1")
+    implementation("androidx.core:core-ktx:1.13.1")
     implementation(platform("androidx.compose:compose-bom:2024.06.00"))
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-graphics")
@@ -87,8 +65,4 @@ dependencies {
     // #1 scheduled send, #11 auto-delete retention purge
     implementation("androidx.work:work-runtime-ktx:2.9.1")
 
-    // One UI / SESL picker catalog: native One UI date/time picker dialogs.
-    implementation("io.github.oneuiproject.sesl:core:1.3.0")
-    implementation("io.github.oneuiproject.sesl:appcompat:1.4.0")
-    implementation("io.github.oneuiproject.sesl:picker-basic:1.2.0")
 }
