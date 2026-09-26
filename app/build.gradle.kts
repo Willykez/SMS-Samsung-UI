@@ -12,8 +12,8 @@ android {
         applicationId = "com.oneui.sms"
         minSdk = 26 // required realistically for default-SMS-app role APIs used here
         targetSdk = 35
-        versionCode = 4
-        versionName = "0.4.0"
+        versionCode = 5
+        versionName = "0.5.0"
     }
 
     buildFeatures {
@@ -67,4 +67,7 @@ dependencies {
 
     // #1 scheduled send, #11 auto-delete retention purge
     implementation("androidx.work:work-runtime-ktx:2.9.1")
+
+    // One UI / SESL picker catalog: native One UI date/time picker dialogs.
+    implementation("io.github.oneuiproject.sesl:picker-basic:1.2.0")
 }

@@ -2,6 +2,9 @@
 
 package com.oneui.sms.ui.scheduled
 
+import android.text.format.DateFormat
+import androidx.picker.app.SeslDatePickerDialog
+import androidx.picker.app.SeslTimePickerDialog
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -122,16 +125,42 @@ fun ScheduledMessagesScreen(
         AlertDialog(
             onDismissRequest = { editing = null },
             title = { Text("Reschedule message") },
-            text = { Text("Choose a new send time using the system date and time picker.") },
+            text = { Text("Choose a new send date and time using the One UI picker.") },
             confirmButton = { TextButton(onClick = {
-                val cal = java.util.Calendar.getInstance().apply { timeInMillis = msg.scheduledAt ?: System.currentTimeMillis() }
-                android.app.DatePickerDialog(context, { _, y, m, d ->
-                    android.app.TimePickerDialog(context, { _, h, min ->
-                        cal.set(y, m, d, h, min, 0); cal.set(java.util.Calendar.MILLISECOND, 0)
-                        onReschedule(msg, cal.timeInMillis); editing = null
-                    }, cal.get(java.util.Calendar.HOUR_OF_DAY), cal.get(java.util.Calendar.MINUTE), false).show()
-                }, cal.get(java.util.Calendar.YEAR), cal.get(java.util.Calendar.MONTH), cal.get(java.util.Calendar.DAY_OF_MONTH)).show()
-            }) { Text("Choose time") } },
+                val cal = java.util.Calendar.getInstance().apply {
+                    timeInMillis = msg.scheduledAt ?: System.currentTimeMillis()
+                }
+                SeslDatePickerDialog(
+                    context,
+                    { _, y, m, d ->
+                        val chosen = java.util.Calendar.getInstance().apply {
+                            timeInMillis = cal.timeInMillis
+                            set(java.util.Calendar.YEAR, y)
+                            set(java.util.Calendar.MONTH, m)
+                            set(java.util.Calendar.DAY_OF_MONTH, d)
+                        }
+                        SeslTimePickerDialog(
+                            context,
+                            { _, h, min ->
+                                chosen.set(java.util.Calendar.HOUR_OF_DAY, h)
+                                chosen.set(java.util.Calendar.MINUTE, min)
+                                chosen.set(java.util.Calendar.SECOND, 0)
+                                chosen.set(java.util.Calendar.MILLISECOND, 0)
+                                if (chosen.timeInMillis > System.currentTimeMillis()) {
+                                    onReschedule(msg, chosen.timeInMillis)
+                                    editing = null
+                                }
+                            },
+                            chosen.get(java.util.Calendar.HOUR_OF_DAY),
+                            chosen.get(java.util.Calendar.MINUTE),
+                            DateFormat.is24HourFormat(context),
+                        ).show()
+                    },
+                    cal.get(java.util.Calendar.YEAR),
+                    cal.get(java.util.Calendar.MONTH),
+                    cal.get(java.util.Calendar.DAY_OF_MONTH),
+                ).show()
+            }) { Text("Choose time") },
             dismissButton = { TextButton(onClick = { editing = null }) { Text("Cancel") } },
         )
     }

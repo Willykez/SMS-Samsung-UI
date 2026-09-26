@@ -185,3 +185,14 @@ This release turns the modern UI into a more complete SMS product while preservi
 
 ### Platform notes
 OneMessages remains a default-SMS-app candidate and retains the minimal MMS/WAP-PUSH stub required by Android role eligibility; MMS content is not parsed, stored, displayed, or composed by the app.
+
+## 0.5.0 Advanced One UI 4 Compose pass
+
+The supplied open-source One UI design catalog was reviewed and translated into
+Compose-native primitives. The app remains a single Compose UI stack instead
+of mixing the legacy View/XML library with Compose.
+
+The conversation screen now has grouped asymmetric bubbles, date separators,
+explicit delivery failure state, an adaptive keyboard-aware composer, rounded
+search, contextual quick-response chips, schedule state, and IME-aware send
+actions. See `ONE_UI_ADVANCED_PASS.md` for the component-by-component mapping.

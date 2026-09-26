@@ -1,0 +1,74 @@
+name: OneMessages Release CI
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  JAVA_VERSION: '17'
+
+jobs:
+  release:
+    name: Test, shrink and build release APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Verify Gradle wrapper
+        run: |
+          chmod +x ./gradlew
+          ./gradlew --version
+
+      - name: Run unit tests
+        run: ./gradlew test --no-daemon --stacktrace
+
+      - name: Build minified release APK
+        run: ./gradlew :app:assembleRelease --no-daemon --stacktrace
+
+      - name: Verify release outputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$(find app/build/outputs/apk/release -name '*.apk' -print -quit)"
+          test -f app/build/outputs/mapping/release/mapping.txt
+          test -f app/build/outputs/mapping/release/seeds.txt
+          test -f app/build/outputs/mapping/release/usage.txt
+
+      - name: Upload release APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: OneMessages-release-${{ github.ref_name }}
+          path: app/build/outputs/apk/release/*.apk
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Upload R8 mapping and shrink reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: OneMessages-r8-${{ github.ref_name }}
+          path: |
+            app/build/outputs/mapping/release/mapping.txt
+            app/build/outputs/mapping/release/seeds.txt
+            app/build/outputs/mapping/release/usage.txt
+          if-no-files-found: error
+          retention-days: 90
