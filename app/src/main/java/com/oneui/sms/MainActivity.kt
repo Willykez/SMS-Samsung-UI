@@ -41,13 +41,20 @@ class MainActivity : ComponentActivity() {
 
     private fun isDefaultSmsApp(): Boolean {
         val currentDefault = Telephony.Sms.getDefaultSmsPackage(this)
-        val matches = currentDefault == packageName
-        val roleAvailable = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            (getSystemService(Context.ROLE_SERVICE) as RoleManager).isRoleAvailable(RoleManager.ROLE_SMS)
+        val roleManager = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            getSystemService(Context.ROLE_SERVICE) as RoleManager
         } else null
-        val roleHeld = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            (getSystemService(Context.ROLE_SERVICE) as RoleManager).isRoleHeld(RoleManager.ROLE_SMS)
-        } else null
+        val roleAvailable = roleManager?.isRoleAvailable(RoleManager.ROLE_SMS)
+        val roleHeld = roleManager?.isRoleHeld(RoleManager.ROLE_SMS)
+
+        // RoleManager is the actual source of truth on API 29+; the legacy
+        // Telephony.Sms.getDefaultSmsPackage() check can return null/stale
+        // even after the role is genuinely granted (seen on some devices/
+        // emulators with no active telephony subscription). Prefer the role
+        // check when it's available, and only fall back to the legacy
+        // package-name comparison pre-Q where RoleManager doesn't exist.
+        val matches = roleHeld ?: (currentDefault == packageName)
+
         val info = "our package: $packageName\n" +
             "system default: $currentDefault\n" +
             "match: $matches\n" +
