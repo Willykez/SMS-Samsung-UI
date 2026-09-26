@@ -83,6 +83,7 @@ data class DraftEntity(
     val updatedAt: Long = System.currentTimeMillis(),
 )
 
+@Entity(tableName = "settings")
 data class SettingsEntity(
     @PrimaryKey val id: Int = 0,
     val recycleBinEnabled: Boolean = true,       // #9
