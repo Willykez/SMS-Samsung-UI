@@ -4,53 +4,23 @@ package com.oneui.sms.ui.thread
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.Schedule
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Send
-import androidx.compose.material.icons.filled.Star
-import androidx.compose.material.icons.filled.StarBorder
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
-import androidx.compose.material3.SuggestionChip
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextField
-import androidx.compose.material3.TextFieldDefaults
-import androidx.compose.material3.TopAppBar
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -58,19 +28,14 @@ import com.oneui.sms.data.local.DeliveryStatus
 import com.oneui.sms.data.local.MessageEntity
 import com.oneui.sms.data.local.QuickResponseEntity
 import java.text.SimpleDateFormat
-import java.util.Calendar
-import java.util.Date
-import java.util.Locale
+import java.util.*
+import android.content.Intent
+import android.net.Uri
 
-/**
- * Splits the screen per the One UI pattern: an upper Viewing Area (message
- * stream) and a lower Interaction Area within thumb reach (composer row,
- * quick-response chips, min 48dp touch targets).
- */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MessageThreadScreen(
     contactName: String,
+    contactAddress: String,
     messages: List<MessageEntity>,
     draft: String,
     isSearching: Boolean,
@@ -81,6 +46,7 @@ fun MessageThreadScreen(
     onSetChatColor: (String?) -> Unit,
     isMuted: Boolean,
     onSetMuted: (Boolean) -> Unit,
+    onBlockNumber: () -> Unit,
     onSetReminder: (MessageEntity, Long, String?) -> Unit,
     onDraftChange: (String) -> Unit,
     onSearchQueryChange: (String) -> Unit,
@@ -94,44 +60,41 @@ fun MessageThreadScreen(
     modifier: Modifier = Modifier,
 ) {
     var showQuickResponses by remember { mutableStateOf(false) }
-    var showScheduleMenu by remember { mutableStateOf(false) }
-    var showConversationMenu by remember { mutableStateOf(false) }
+    var showTools by remember { mutableStateOf(false) }
     var showColorPicker by remember { mutableStateOf(false) }
-
-    val bubbleTint = chatColorHex?.let {
-        runCatching { Color(android.graphics.Color.parseColor(it)) }.getOrNull()
-    }
+    var showProfile by remember { mutableStateOf(false) }
+    var infoMessage by remember { mutableStateOf<MessageEntity?>(null) }
+    val context = LocalContext.current
+    val bubbleTint = chatColorHex?.let { runCatching { Color(android.graphics.Color.parseColor(it)) }.getOrNull() }
+    val otp = remember(messages) { messages.asReversed().firstNotNullOfOrNull { SmartSms.extractOtp(it.body) } }
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
+        containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             if (isSearching) {
                 SearchTopBar(onQueryChange = onSearchQueryChange, onClose = onToggleSearch)
             } else {
                 TopAppBar(
-                    title = { Text(contactName, fontWeight = FontWeight.SemiBold) },
-                    navigationIcon = {
-                        IconButton(onClick = onBack) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                    title = {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Avatar(initials = contactName.take(1).uppercase())
+                            Column(Modifier.padding(start = 12.dp)) {
+                                Text(contactName, fontWeight = FontWeight.SemiBold)
+                                Text(if (isMuted) "SMS · Muted" else "SMS", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
                         }
                     },
+                    navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") } },
                     actions = {
-                        IconButton(onClick = onToggleSearch) { // #12
-                            Icon(Icons.Filled.Search, contentDescription = "Search in conversation")
-                        }
+                        IconButton(onClick = onToggleSearch) { Icon(Icons.Filled.Search, "Search") }
                         Box {
-                            IconButton(onClick = { showConversationMenu = true }) {
-                                Icon(Icons.Filled.MoreVert, contentDescription = "Conversation options")
-                            }
-                            DropdownMenu(expanded = showConversationMenu, onDismissRequest = { showConversationMenu = false }) {
-                                DropdownMenuItem(
-                                    text = { Text(if (isMuted) "Unmute notifications" else "Mute notifications") }, // #5
-                                    onClick = { showConversationMenu = false; onSetMuted(!isMuted) },
-                                )
-                                DropdownMenuItem(
-                                    text = { Text("Chat background color") }, // #7
-                                    onClick = { showConversationMenu = false; showColorPicker = true },
-                                )
+                            IconButton(onClick = { showTools = true }) { Icon(Icons.Filled.MoreVert, "Conversation options") }
+                            DropdownMenu(showTools, { showTools = false }) {
+                                DropdownMenuItem(text = { Text(if (isMuted) "Unmute notifications" else "Mute notifications") }, leadingIcon = { Icon(Icons.Filled.NotificationsOff, null) }, onClick = { showTools = false; onSetMuted(!isMuted) })
+                                DropdownMenuItem(text = { Text("Chat appearance") }, leadingIcon = { Icon(Icons.Filled.Palette, null) }, onClick = { showTools = false; showColorPicker = true })
+                                DropdownMenuItem(text = { Text("Contact profile") }, leadingIcon = { Icon(Icons.Filled.Person, null) }, onClick = { showTools = false; showProfile = true })
+                                DropdownMenuItem(text = { Text("Block number") }, leadingIcon = { Icon(Icons.Filled.Block, null) }, onClick = { showTools = false; onBlockNumber() })
                             }
                         }
                     },
@@ -140,328 +103,118 @@ fun MessageThreadScreen(
         },
         bottomBar = {
             Column {
-                if (showQuickResponses) {
-                    QuickResponseRow(quickResponses) { response ->
-                        onPickQuickResponse(response)
-                        showQuickResponses = false
-                    }
-                }
-                if (pendingScheduleTime != null) {
-                    ScheduleChip(timeMillis = pendingScheduleTime, onClear = { onSetScheduleTime(null) })
-                }
-                InteractionBar(
-                    draft = draft,
-                    onDraftChange = onDraftChange,
-                    onSend = onSend,
-                    onToggleQuickResponses = { showQuickResponses = !showQuickResponses },
-                    onOpenScheduleMenu = { showScheduleMenu = true },
-                    scheduleMenuExpanded = showScheduleMenu,
-                    onDismissScheduleMenu = { showScheduleMenu = false },
-                    onPickSchedulePreset = { minutesFromNow ->
-                        showScheduleMenu = false
-                        onSetScheduleTime(System.currentTimeMillis() + minutesFromNow * 60_000L)
-                    },
-                    isScheduled = pendingScheduleTime != null,
-                )
+                if (showQuickResponses) QuickResponseRow(quickResponses) { onPickQuickResponse(it); showQuickResponses = false }
+                if (pendingScheduleTime != null) ScheduleChip(pendingScheduleTime) { onSetScheduleTime(null) }
+                InteractionBar(draft, onDraftChange, onSend, { showQuickResponses = !showQuickResponses }, { /* schedule menu */ }, pendingScheduleTime != null, onSetScheduleTime)
             }
         },
     ) { padding ->
         LazyColumn(
             modifier = Modifier.fillMaxSize().padding(padding),
-            reverseLayout = true, // newest at bottom, matches chat convention
-            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+            reverseLayout = true,
+            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            items(
-                items = messages.asReversed(),
-                key = { it.id },
-                // contentType groups incoming/outgoing bubbles so Compose can reuse
-                // layout slots during fast scroll, per the report's recomposition guidance.
-                contentType = { if (it.isOutgoing) "outgoing" else "incoming" },
-            ) { message ->
-                MessageBubble(
-                    message,
-                    fontScale,
-                    outgoingTint = bubbleTint,
-                    onToggleStar = { onToggleStar(message) },
-                    onDelete = { onDeleteMessage(message.id) },
-                    onSetReminder = { minutesFromNow ->
-                        onSetReminder(message, System.currentTimeMillis() + minutesFromNow * 60_000L, null)
-                    },
-                )
+            if (otp != null) {
+                item(key = "otp") { OtpCard(otp) }
+            }
+            items(messages.asReversed(), key = { it.id }) { message ->
+                MessageBubble(message, fontScale, bubbleTint, { onToggleStar(message) }, { onDeleteMessage(message.id) }, { mins -> onSetReminder(message, System.currentTimeMillis() + mins * 60_000L, null) }, { infoMessage = message })
             }
         }
     }
-
-    if (showColorPicker) {
-        ChatColorPickerDialog(
-            current = bubbleTint,
-            onPick = { hex -> onSetChatColor(hex); showColorPicker = false },
-            onDismiss = { showColorPicker = false },
+    if (showColorPicker) ChatColorPickerDialog(bubbleTint, { onSetChatColor(it); showColorPicker = false }) { showColorPicker = false }
+    if (showProfile) {
+        AlertDialog(
+            onDismissRequest = { showProfile = false },
+            title = { Row(verticalAlignment = Alignment.CenterVertically) { Avatar(contactName.take(1).uppercase()); Column(Modifier.padding(start = 12.dp)) { Text(contactName, fontWeight = FontWeight.SemiBold); Text("SMS contact", style = MaterialTheme.typography.labelSmall) } } },
+            text = { Column(verticalArrangement = Arrangement.spacedBy(8.dp)) { Text(contactAddress, style = MaterialTheme.typography.bodyMedium); Text("Messages are sent as standard SMS.", color = MaterialTheme.colorScheme.onSurfaceVariant) } },
+            confirmButton = { TextButton(onClick = { context.startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:${contactAddress}"))); showProfile = false }) { Text("Call") } },
+            dismissButton = { TextButton(onClick = { showProfile = false }) { Text("Close") } },
         )
     }
-}
-
-private val CHAT_COLOR_SWATCHES = listOf(
-    null to "Default",
-    "#0381FE" to "Blue",
-    "#34C759" to "Green",
-    "#FF9500" to "Orange",
-    "#AF52DE" to "Purple",
-    "#FF3B30" to "Red",
-)
-
-@Composable
-private fun ChatColorPickerDialog(current: Color?, onPick: (String?) -> Unit, onDismiss: () -> Unit) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Chat background color") },
-        text = {
-            Column {
-                CHAT_COLOR_SWATCHES.forEach { (hex, label) ->
-                    Row(
-                        Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 4.dp)
-                            .combinedClickableSimple { onPick(hex) },
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Surface(
-                            shape = MaterialTheme.shapes.small,
-                            color = hex?.let { Color(android.graphics.Color.parseColor(it)) } ?: MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(24.dp),
-                        ) {}
-                        Text(label, modifier = Modifier.padding(start = 12.dp))
-                    }
-                }
-            }
-        },
-        confirmButton = {},
-        dismissButton = { androidx.compose.material3.TextButton(onClick = onDismiss) { Text("Close") } },
-    )
-}
-
-@OptIn(ExperimentalFoundationApi::class)
-private fun Modifier.combinedClickableSimple(onClick: () -> Unit): Modifier =
-    this.then(Modifier.combinedClickable(onClick = onClick, onLongClick = {}))
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun SearchTopBar(onQueryChange: (String) -> Unit, onClose: () -> Unit) {
-    var query by remember { mutableStateOf("") }
-    TopAppBar(
-        title = {
-            TextField(
-                value = query,
-                onValueChange = { query = it; onQueryChange(it) },
-                placeholder = { Text("Search in conversation") },
-                colors = TextFieldDefaults.colors(),
-                modifier = Modifier.fillMaxWidth(),
-            )
-        },
-        navigationIcon = {
-            IconButton(onClick = { onQueryChange(""); onClose() }) {
-                Icon(Icons.Filled.Close, contentDescription = "Close search")
-            }
-        },
-    )
-}
-
-@OptIn(ExperimentalFoundationApi::class)
-@Composable
-private fun MessageBubble(
-    message: MessageEntity,
-    fontScale: Float,
-    outgoingTint: Color?,
-    onToggleStar: () -> Unit,
-    onDelete: () -> Unit,
-    onSetReminder: (Long) -> Unit,
-) {
-    val bubbleColor = if (message.isOutgoing) (outgoingTint ?: MaterialTheme.colorScheme.primary) else MaterialTheme.colorScheme.surfaceVariant
-    val textColor = if (message.isOutgoing) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
-    val alignment = if (message.isOutgoing) Alignment.CenterEnd else Alignment.CenterStart
-    var showActions by remember { mutableStateOf(false) }
-
-    if (message.status == DeliveryStatus.SCHEDULED) {
-        // Matches the "Message scheduled." system notice bubble from the reference design.
-        Box(Modifier.fillMaxWidth()) {
-            Surface(
-                shape = MaterialTheme.shapes.large,
-                color = MaterialTheme.colorScheme.inverseSurface,
-                modifier = Modifier.align(Alignment.Center),
-            ) {
-                Text(
-                    "Message scheduled",
-                    color = MaterialTheme.colorScheme.inverseOnSurface,
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                    fontSize = (12 * fontScale).sp,
-                )
-            }
-        }
-        return
+    infoMessage?.let { message ->
+        AlertDialog(onDismissRequest = { infoMessage = null }, title = { Text("Message info") }, text = { Column(verticalArrangement = Arrangement.spacedBy(8.dp)) { Text(message.body); Text("${if (message.isOutgoing) "Sent" else "Received"} · ${SimpleDateFormat("EEE, d MMM yyyy h:mm a", Locale.getDefault()).format(Date(message.timestamp))}"); Text("Status · ${message.status.name.lowercase().replace('_',' ')}"); Text("${message.body.length} characters · ${SmartSms.smsSegments(message.body)} SMS ${if (SmartSms.smsSegments(message.body) == 1) "segment" else "segments"}") } }, confirmButton = { TextButton(onClick = { infoMessage = null }) { Text("Done") } })
     }
+}
 
-    Box(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.align(alignment).widthIn(max = 280.dp)) {
-            Surface(
-                color = bubbleColor,
-                shape = MaterialTheme.shapes.large, // fully rounded, One UI-style
-                modifier = Modifier.combinedClickable(
-                    onClick = {},
-                    onLongClick = { showActions = true },
-                ),
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        message.body,
-                        color = textColor,
-                        fontSize = (16 * fontScale).sp, // #8 font scale
-                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
-                    )
-                    if (message.isStarred) { // #2
-                        Icon(
-                            Icons.Filled.Star,
-                            contentDescription = "Starred",
-                            tint = textColor,
-                            modifier = Modifier.size(14.dp).padding(end = 8.dp),
-                        )
-                    }
-                }
-            }
-            if (message.isOutgoing && message.status == DeliveryStatus.FAILED) {
-                Text(
-                    "Not sent — tap to retry",
-                    color = MaterialTheme.colorScheme.error,
-                    style = MaterialTheme.typography.labelSmall,
-                    modifier = Modifier.align(Alignment.End).padding(top = 2.dp, end = 4.dp),
-                )
-            }
-            DropdownMenu(expanded = showActions, onDismissRequest = { showActions = false }) {
-                DropdownMenuItem(
-                    text = { Text(if (message.isStarred) "Unstar" else "Star") },
-                    leadingIcon = { Icon(if (message.isStarred) Icons.Filled.Star else Icons.Filled.StarBorder, null) },
-                    onClick = { showActions = false; onToggleStar() },
-                )
-                DropdownMenuItem(
-                    text = { Text("Remind me in 1 hour") }, // #3
-                    onClick = { showActions = false; onSetReminder(60) },
-                )
-                DropdownMenuItem(
-                    text = { Text("Remind me tomorrow, 9am") },
-                    onClick = { showActions = false; onSetReminder(minutesUntilTomorrow9am()) },
-                )
-                DropdownMenuItem(
-                    text = { Text("Delete") },
-                    onClick = { showActions = false; onDelete() },
-                )
-            }
+@Composable private fun Avatar(initials: String) {
+    Surface(Modifier.size(40.dp), CircleShape, color = MaterialTheme.colorScheme.primaryContainer) { Box(contentAlignment = Alignment.Center) { Text(initials, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimaryContainer) } }
+}
+
+@Composable private fun OtpCard(code: String) {
+    Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer), shape = MaterialTheme.shapes.large) {
+        Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Filled.Key, null, tint = MaterialTheme.colorScheme.primary)
+            Column(Modifier.weight(1f).padding(horizontal = 12.dp)) { Text("Verification code", fontWeight = FontWeight.SemiBold); Text(code.chunked(3).joinToString(" "), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) }
+            val clipboard = LocalClipboardManager.current
+            TextButton(onClick = { clipboard.setText(AnnotatedString(code)) }) { Text("Copy") }
         }
     }
 }
 
-@Composable
-private fun QuickResponseRow(responses: List<QuickResponseEntity>, onPick: (QuickResponseEntity) -> Unit) {
+@Composable private fun MessageBubble(message: MessageEntity, fontScale: Float, outgoingTint: Color?, onStar: () -> Unit, onDelete: () -> Unit, onReminder: (Long) -> Unit, onInfo: () -> Unit) {
+    val outgoing = message.isOutgoing
+    val color = if (outgoing) (outgoingTint ?: MaterialTheme.colorScheme.primary) else MaterialTheme.colorScheme.surfaceVariant
+    val textColor = if (outgoing) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+    var menu by remember { mutableStateOf(false) }
+    val clipboard = LocalClipboardManager.current
+    Column(Modifier.fillMaxWidth(), horizontalAlignment = if (outgoing) Alignment.End else Alignment.Start) {
+        Surface(color = color, shape = if (outgoing) RoundedCornerShape(22.dp, 22.dp, 6.dp, 22.dp) else RoundedCornerShape(22.dp, 22.dp, 22.dp, 6.dp), modifier = Modifier.widthIn(max = 330.dp).combinedClickable(onClick = {}, onLongClick = { menu = true })) {
+            Row(Modifier.padding(horizontal = 16.dp, vertical = 11.dp), verticalAlignment = Alignment.Bottom) {
+                Text(message.body, color = textColor, fontSize = (16 * fontScale).sp, lineHeight = (22 * fontScale).sp)
+                if (message.isStarred) Icon(Icons.Filled.Star, null, tint = textColor, modifier = Modifier.padding(start = 7.dp).size(14.dp))
+            }
+        }
+        Row(Modifier.padding(horizontal = 5.dp, vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text(SimpleDateFormat("h:mm a", Locale.getDefault()).format(Date(message.timestamp)), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            if (outgoing) Icon(if (message.status == DeliveryStatus.FAILED) Icons.Filled.ErrorOutline else if (message.status == DeliveryStatus.PENDING) Icons.Filled.Schedule else Icons.Filled.Done, null, modifier = Modifier.padding(start = 4.dp).size(13.dp), tint = if (message.status == DeliveryStatus.FAILED) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        DropdownMenu(menu, { menu = false }) {
+            DropdownMenuItem({ Text("Copy text") }, { clipboard.setText(AnnotatedString(message.body)); menu = false }, leadingIcon = { Icon(Icons.Filled.ContentCopy, null) })
+            DropdownMenuItem({ Text(if (message.isStarred) "Unstar" else "Star") }, { onStar(); menu = false }, leadingIcon = { Icon(if (message.isStarred) Icons.Filled.Star else Icons.Filled.StarBorder, null) })
+            DropdownMenuItem({ Text("Remind me in 1 hour") }, { onReminder(60); menu = false }, leadingIcon = { Icon(Icons.Filled.Alarm, null) })
+            DropdownMenuItem({ Text("Delete") }, { onDelete(); menu = false }, leadingIcon = { Icon(Icons.Filled.DeleteOutline, null) })
+            DropdownMenuItem({ Text("Message info") }, { onInfo(); menu = false }, leadingIcon = { Icon(Icons.Filled.Info, null) })
+        }
+    }
+}
+
+@Composable private fun QuickResponseRow(responses: List<QuickResponseEntity>, onPick: (QuickResponseEntity) -> Unit) {
     if (responses.isEmpty()) return
-    LazyRow(
-        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        items(responses, key = { it.id }) { response ->
-            SuggestionChip(onClick = { onPick(response) }, label = { Text(response.text) })
-        }
+    LazyRow(contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) { items(responses, key = { it.id }) { SuggestionChip(onClick = { onPick(it) }, label = { Text(it.text, maxLines = 1) }) } }
+}
+
+@Composable private fun ScheduleChip(time: Long, onClear: () -> Unit) {
+    Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 5.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+        Row(verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Filled.Schedule, null, Modifier.size(16.dp)); Text("Scheduled · ${SimpleDateFormat("EEE, h:mm a", Locale.getDefault()).format(Date(time))}", style = MaterialTheme.typography.labelMedium, Modifier.padding(start = 6.dp)) }
+        IconButton(onClick = onClear, Modifier.size(32.dp)) { Icon(Icons.Filled.Close, "Cancel") }
     }
 }
 
-@Composable
-private fun ScheduleChip(timeMillis: Long, onClear: () -> Unit) {
-    val formatter = remember { SimpleDateFormat("EEE, d MMM h:mm a", Locale.getDefault()) }
-    Row(
-        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween,
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Filled.Schedule, contentDescription = null, modifier = Modifier.size(16.dp))
-            Text(
-                "Will be sent: ${formatter.format(Date(timeMillis))}",
-                style = MaterialTheme.typography.labelMedium,
-                modifier = Modifier.padding(start = 4.dp),
-            )
-        }
-        IconButton(onClick = onClear, modifier = Modifier.size(32.dp)) {
-            Icon(Icons.Filled.Close, contentDescription = "Cancel scheduling")
-        }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun InteractionBar(
-    draft: String,
-    onDraftChange: (String) -> Unit,
-    onSend: () -> Unit,
-    onToggleQuickResponses: () -> Unit,
-    onOpenScheduleMenu: () -> Unit,
-    scheduleMenuExpanded: Boolean,
-    onDismissScheduleMenu: () -> Unit,
-    onPickSchedulePreset: (Long) -> Unit,
-    isScheduled: Boolean,
-) {
-    // Everything here sits in the lower thumb-sweep zone with >=48dp targets,
-    // matching the report's "Interact Naturally" ergonomic requirement.
-    Surface(tonalElevation = 2.dp) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Box {
-                IconButton(onClick = onOpenScheduleMenu) {
-                    Icon(Icons.Filled.Add, contentDescription = "More options")
+@Composable private fun InteractionBar(draft: String, onDraftChange: (String) -> Unit, onSend: () -> Unit, onQuick: () -> Unit, onSchedule: () -> Unit, scheduled: Boolean, onSetSchedule: (Long?) -> Unit) {
+    val segments = SmartSms.smsSegments(draft)
+    Surface(tonalElevation = 4.dp) {
+        Column(Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 8.dp)) {
+            Row(verticalAlignment = Alignment.Bottom) {
+                IconButton(onClick = onQuick, Modifier.size(48.dp)) { Icon(Icons.Filled.Bolt, "Quick replies") }
+                Box {
+                    IconButton(onClick = { onSetSchedule(System.currentTimeMillis() + 60 * 60_000L) }, Modifier.size(48.dp)) { Icon(if (scheduled) Icons.Filled.Schedule else Icons.Filled.CalendarMonth, "Schedule SMS") }
                 }
-                DropdownMenu(expanded = scheduleMenuExpanded, onDismissRequest = onDismissScheduleMenu) {
-                    DropdownMenuItem(text = { Text("Quick responses") }, onClick = { onDismissScheduleMenu(); onToggleQuickResponses() })
-                    DropdownMenuItem(text = { Text("Schedule: in 1 hour") }, onClick = { onPickSchedulePreset(60) }) // #1
-                    DropdownMenuItem(text = { Text("Schedule: tonight 8pm") }, onClick = {
-                        onPickSchedulePreset(minutesUntilTonight8pm())
-                    })
-                    DropdownMenuItem(text = { Text("Schedule: tomorrow 9am") }, onClick = {
-                        onPickSchedulePreset(minutesUntilTomorrow9am())
-                    })
-                }
+                OutlinedTextField(value = draft, onValueChange = onDraftChange, modifier = Modifier.weight(1f), placeholder = { Text("Text message") }, shape = MaterialTheme.shapes.extraLarge, maxLines = 5, colors = TextFieldDefaults.colors(unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant, focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant, unfocusedIndicatorColor = Color.Transparent, focusedIndicatorColor = Color.Transparent))
+                IconButton(onClick = onSend, enabled = draft.isNotBlank(), Modifier.size(48.dp)) { Surface(Modifier.size(40.dp), CircleShape, color = if (draft.isNotBlank()) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant) { Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Icon(if (scheduled) Icons.Filled.Schedule else Icons.Filled.Send, null, tint = if (draft.isNotBlank()) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant) } } }
             }
-            OutlinedTextField(
-                value = draft,
-                onValueChange = onDraftChange,
-                modifier = Modifier.weight(1f),
-                placeholder = { Text("Message") },
-                shape = MaterialTheme.shapes.extraLarge,
-                colors = TextFieldDefaults.colors(),
-            )
-            IconButton(onClick = onSend, modifier = Modifier.size(48.dp)) {
-                Icon(
-                    if (isScheduled) Icons.Filled.Schedule else Icons.Filled.Send,
-                    contentDescription = if (isScheduled) "Schedule send" else "Send",
-                    tint = MaterialTheme.colorScheme.primary,
-                )
-            }
+            if (draft.isNotEmpty()) Text("${draft.length} characters · $segments SMS ${if (segments == 1) "segment" else "segments"}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(start = 56.dp, top = 3.dp))
         }
     }
 }
 
-private fun minutesUntilTonight8pm(): Long {
-    val cal = Calendar.getInstance()
-    val target = Calendar.getInstance().apply {
-        set(Calendar.HOUR_OF_DAY, 20); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0)
-        if (before(cal)) add(Calendar.DAY_OF_YEAR, 1)
-    }
-    return (target.timeInMillis - cal.timeInMillis) / 60_000
+@Composable private fun SearchTopBar(onQueryChange: (String) -> Unit, onClose: () -> Unit) {
+    var query by remember { mutableStateOf("") }
+    TopAppBar(title = { TextField(value = query, onValueChange = { query = it; onQueryChange(it) }, placeholder = { Text("Search this conversation") }, singleLine = true, colors = TextFieldDefaults.colors(unfocusedIndicatorColor = Color.Transparent, focusedIndicatorColor = Color.Transparent)) }, navigationIcon = { IconButton(onClick = onClose) { Icon(Icons.Filled.Close, "Close search") } })
 }
 
-private fun minutesUntilTomorrow9am(): Long {
-    val cal = Calendar.getInstance()
-    val target = Calendar.getInstance().apply {
-        add(Calendar.DAY_OF_YEAR, 1)
-        set(Calendar.HOUR_OF_DAY, 9); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0)
-    }
-    return (target.timeInMillis - cal.timeInMillis) / 60_000
+@Composable private fun ChatColorPickerDialog(current: Color?, onPick: (String?) -> Unit, onDismiss: () -> Unit) {
+    val swatches = listOf(null to "Default", "#0381FE" to "Blue", "#34C759" to "Green", "#FF9500" to "Orange", "#AF52DE" to "Purple", "#FF3B30" to "Red")
+    AlertDialog(onDismissRequest = onDismiss, title = { Text("Chat appearance") }, text = { Column { swatches.forEach { (hex, label) -> TextButton(onClick = { onPick(hex) }, Modifier.fillMaxWidth()) { Text(label) } } } }, confirmButton = { TextButton(onClick = onDismiss) { Text("Close") } })
 }

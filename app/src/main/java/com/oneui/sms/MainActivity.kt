@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.os.Bundle
+import androidx.activity.enableEdgeToEdge
 import android.provider.Telephony
 import android.util.Log
 import androidx.activity.ComponentActivity
@@ -27,6 +28,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.oneui.sms.ui.navigation.OneMessagesNavHost
+import com.oneui.sms.data.SettingsRepository
+import androidx.compose.runtime.collectAsState
 import com.oneui.sms.ui.theme.OneMessagesTheme
 
 private const val TAG = "DefaultSmsCheck"
@@ -66,10 +69,12 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        enableEdgeToEdge()
         isDefaultSmsState.value = isDefaultSmsApp()
 
         setContent {
-            OneMessagesTheme {
+            val settings = SettingsRepository(applicationContext).observe().collectAsState(initial = com.oneui.sms.data.local.SettingsEntity())
+            OneMessagesTheme(themeMode = settings.value.themeMode) {
                 Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
                     val isDefault by isDefaultSmsState
                     val debugInfo by debugInfoState

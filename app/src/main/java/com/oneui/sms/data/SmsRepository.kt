@@ -1,9 +1,12 @@
 package com.oneui.sms.data
 
+import android.app.PendingIntent
 import android.content.ContentValues
+import android.content.Intent
 import android.content.Context
 import android.net.Uri
 import android.provider.Telephony
+import android.provider.ContactsContract
 import android.telephony.SmsManager
 import androidx.core.content.ContextCompat
 import com.oneui.sms.data.local.AppDatabase
@@ -36,6 +39,14 @@ class SmsRepository(private val context: Context) {
         db.messageDao().observeThread(threadId)
 
     /** Pulls the latest state from Telephony.Sms into the local Room cache. */
+    private fun resolveDisplayName(address: String): String? {
+        val cursor = resolver.query(
+            Uri.withAppendedPath(ContactsContract.PhoneLookup.CONTENT_FILTER_URI, Uri.encode(address)),
+            arrayOf(ContactsContract.PhoneLookup.DISPLAY_NAME), null, null, null,
+        ) ?: return null
+        return cursor.use { if (it.moveToFirst()) it.getString(0) else null }
+    }
+
     suspend fun refreshConversations() = withContext(Dispatchers.IO) {
         val projection = arrayOf(
             Telephony.Sms.Conversations.THREAD_ID,
@@ -165,9 +176,21 @@ class SmsRepository(private val context: Context) {
         resolver.insert(Telephony.Sms.CONTENT_URI, values)
 
         val smsManager = ContextCompat.getSystemService(context, SmsManager::class.java)
-        smsManager?.sendTextMessage(address, null, body, null, null)
-
-        db.messageDao().updateStatus(pendingId, DeliveryStatus.SENT)
+        val sentIntent = PendingIntent.getBroadcast(
+            context, pendingId.hashCode(),
+            Intent(context, com.oneui.sms.receiver.SmsSentReceiver::class.java).putExtra("messageId", pendingId),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+        val deliveredIntent = PendingIntent.getBroadcast(
+            context, pendingId.hashCode() + 1,
+            Intent(context, com.oneui.sms.receiver.SmsDeliveredReceiver::class.java).putExtra("messageId", pendingId),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+        try {
+            smsManager?.sendTextMessage(address, null, body, sentIntent, deliveredIntent)
+        } catch (_: Exception) {
+            db.messageDao().updateStatus(pendingId, DeliveryStatus.FAILED)
+        }
     }
 
     /** #1 — queues a message for later; the actual send is fired by ScheduledSendWorker. */
@@ -194,6 +217,20 @@ class SmsRepository(private val context: Context) {
         com.oneui.sms.worker.ScheduledSendWorker.cancel(context, messageId)
         db.messageDao().deleteHard(messageId)
     }
+
+    suspend fun rescheduleMessage(message: MessageEntity, sendAt: Long) = withContext(Dispatchers.IO) {
+        com.oneui.sms.worker.ScheduledSendWorker.cancel(context, message.id)
+        db.messageDao().upsert(message.copy(timestamp = sendAt, scheduledAt = sendAt, status = DeliveryStatus.SCHEDULED))
+        com.oneui.sms.worker.ScheduledSendWorker.enqueue(context, message.id, message.threadId, message.address, message.body, sendAt)
+    }
+
+    suspend fun sendScheduledNow(message: MessageEntity) = withContext(Dispatchers.IO) {
+        com.oneui.sms.worker.ScheduledSendWorker.cancel(context, message.id)
+        db.messageDao().deleteHard(message.id)
+        sendMessage(message.threadId, message.address, message.body)
+    }
+
+    suspend fun setMessageStatus(messageId: Long, status: DeliveryStatus) = withContext(Dispatchers.IO) { db.messageDao().updateStatus(messageId, status) }
 
     // ---- #2 star ----
     fun observeStarred(): Flow<List<MessageEntity>> = db.messageDao().observeStarred()
@@ -243,6 +280,7 @@ class SmsRepository(private val context: Context) {
     // ---- #12 search within a thread ----
     fun searchInThread(threadId: Long, query: String): Flow<List<MessageEntity>> =
         db.messageDao().searchInThread(threadId, query)
+    fun searchAllMessages(query: String): Flow<List<MessageEntity>> = db.messageDao().searchAll(query)
 
     // ---- #1 scheduled list ----
     fun observeScheduled(): Flow<List<MessageEntity>> = db.messageDao().observeScheduled()
@@ -281,6 +319,31 @@ class SmsRepository(private val context: Context) {
         com.oneui.sms.reminder.ReminderScheduler.cancel(context, reminderId)
         db.reminderDao().deleteForMessage(messageId)
     }
+
+    // ---- Deep functionality: drafts / blocked numbers / archive ----
+    fun observeDraft(threadId: Long): Flow<com.oneui.sms.data.local.DraftEntity?> = db.draftDao().observe(threadId)
+    suspend fun saveDraft(threadId: Long, address: String, body: String) = withContext(Dispatchers.IO) {
+        if (body.isBlank()) db.draftDao().delete(threadId)
+        else db.draftDao().upsert(com.oneui.sms.data.local.DraftEntity(threadId, address, body, System.currentTimeMillis()))
+    }
+    suspend fun clearDraft(threadId: Long) = withContext(Dispatchers.IO) { db.draftDao().delete(threadId) }
+    fun observeDrafts(): Flow<List<com.oneui.sms.data.local.DraftEntity>> = db.draftDao().observeAll()
+
+    fun observeBlockedNumbers(): Flow<List<com.oneui.sms.data.local.BlockedNumberEntity>> = db.blockedNumberDao().observeAll()
+    suspend fun blockNumber(number: String, reason: String? = null) = withContext(Dispatchers.IO) {
+        val normalized = android.telephony.PhoneNumberUtils.normalizeNumber(number)
+        db.blockedNumberDao().upsert(com.oneui.sms.data.local.BlockedNumberEntity(normalized, number, reason))
+    }
+    suspend fun unblockNumber(number: String) = withContext(Dispatchers.IO) {
+        db.blockedNumberDao().remove(android.telephony.PhoneNumberUtils.normalizeNumber(number))
+    }
+    suspend fun isBlocked(number: String): Boolean = withContext(Dispatchers.IO) {
+        db.blockedNumberDao().isBlocked(android.telephony.PhoneNumberUtils.normalizeNumber(number))
+    }
+
+    fun observeArchived(): Flow<List<ConversationEntity>> = db.conversationDao().observeArchived()
+    suspend fun archive(threadId: Long, archived: Boolean) = withContext(Dispatchers.IO) { db.conversationDao().setArchived(listOf(threadId), archived) }
+    suspend fun deleteConversationHard(threadId: Long) = withContext(Dispatchers.IO) { db.conversationDao().deleteHard(threadId) }
 
     // ---- new conversation / contact picker support ----
     /**

@@ -2,7 +2,6 @@
 
 package com.oneui.sms.ui.scheduled
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -16,7 +15,11 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material.icons.filled.Send
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -27,6 +30,9 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -47,6 +53,8 @@ class ScheduledMessagesViewModel(private val repository: SmsRepository) : ViewMo
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     fun cancel(messageId: Long) = viewModelScope.launch { repository.cancelScheduled(messageId) }
+    fun reschedule(message: MessageEntity, at: Long) = viewModelScope.launch { repository.rescheduleMessage(message, at) }
+    fun sendNow(message: MessageEntity) = viewModelScope.launch { repository.sendScheduledNow(message) }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -54,9 +62,13 @@ class ScheduledMessagesViewModel(private val repository: SmsRepository) : ViewMo
 fun ScheduledMessagesScreen(
     messages: List<MessageEntity>,
     onCancel: (Long) -> Unit,
+    onReschedule: (MessageEntity, Long) -> Unit,
+    onSendNow: (MessageEntity) -> Unit,
     onBack: () -> Unit,
 ) {
     val formatter = remember { SimpleDateFormat("EEE, d MMM yyyy h:mm a", Locale.getDefault()) }
+    var editing by remember { mutableStateOf<MessageEntity?>(null) }
+    val context = LocalContext.current
 
     Scaffold(
         topBar = {
@@ -96,12 +108,31 @@ fun ScheduledMessagesScreen(
                                 )
                             }
                         }
-                        IconButton(onClick = { onCancel(msg.id) }) {
-                            Icon(Icons.Filled.Close, contentDescription = "Cancel scheduled message")
+                        Row {
+                            IconButton(onClick = { onSendNow(msg) }) { Icon(Icons.Filled.Send, "Send now") }
+                            IconButton(onClick = { editing = msg }) { Icon(Icons.Filled.Edit, "Reschedule") }
+                            IconButton(onClick = { onCancel(msg.id) }) { Icon(Icons.Filled.Close, "Cancel") }
                         }
                     }
                 }
             }
         }
+    }
+    editing?.let { msg ->
+        AlertDialog(
+            onDismissRequest = { editing = null },
+            title = { Text("Reschedule message") },
+            text = { Text("Choose a new send time using the system date and time picker.") },
+            confirmButton = { TextButton(onClick = {
+                val cal = java.util.Calendar.getInstance().apply { timeInMillis = msg.scheduledAt ?: System.currentTimeMillis() }
+                android.app.DatePickerDialog(context, { _, y, m, d ->
+                    android.app.TimePickerDialog(context, { _, h, min ->
+                        cal.set(y, m, d, h, min, 0); cal.set(java.util.Calendar.MILLISECOND, 0)
+                        onReschedule(msg, cal.timeInMillis); editing = null
+                    }, cal.get(java.util.Calendar.HOUR_OF_DAY), cal.get(java.util.Calendar.MINUTE), false).show()
+                }, cal.get(java.util.Calendar.YEAR), cal.get(java.util.Calendar.MONTH), cal.get(java.util.Calendar.DAY_OF_MONTH)).show()
+            }) { Text("Choose time") } },
+            dismissButton = { TextButton(onClick = { editing = null }) { Text("Cancel") } },
+        )
     }
 }

@@ -23,9 +23,9 @@ class MessageThreadViewModel(
 
     // #12 in-thread search: empty query falls back to the normal thread view.
     private val searchQuery = MutableStateFlow("")
-    val isSearching: StateFlow<Boolean> = searchQuery
-        .map { it.isNotEmpty() }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+    private val _isSearching = MutableStateFlow(false)
+    val isSearching: StateFlow<Boolean> = _isSearching
+    fun toggleSearch() { _isSearching.value = !_isSearching.value; if (!_isSearching.value) searchQuery.value = "" }
 
     val messages: StateFlow<List<MessageEntity>> = searchQuery
         .flatMapLatest { q ->
@@ -58,10 +58,12 @@ class MessageThreadViewModel(
     init {
         viewModelScope.launch { repository.refreshThread(threadId) }
         viewModelScope.launch { repository.markRead(listOf(threadId)) }
+        viewModelScope.launch { repository.observeDraft(threadId).collect { _draft.value = it?.body ?: "" } }
     }
 
     fun onDraftChange(text: String) {
         _draft.value = text
+        viewModelScope.launch { repository.saveDraft(threadId, address, text) }
     }
 
     fun onSearchQueryChange(query: String) {
@@ -74,6 +76,7 @@ class MessageThreadViewModel(
         val scheduleAt = _pendingScheduleTime.value
         _draft.value = ""
         _pendingScheduleTime.value = null
+        viewModelScope.launch { repository.clearDraft(threadId) }
         viewModelScope.launch {
             if (scheduleAt != null) {
                 repository.scheduleMessage(threadId, address, body, scheduleAt) // #1

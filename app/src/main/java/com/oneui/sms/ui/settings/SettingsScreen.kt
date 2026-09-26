@@ -76,7 +76,7 @@ fun SettingsScreen(
     ) { padding ->
         Column(Modifier.fillMaxSize().padding(padding).padding(horizontal = 16.dp, vertical = 8.dp)) {
             SettingsGroup {
-                SettingsRow(title = "Chat settings", onClick = { onOpenStub("Chat settings") })
+                SettingsRow(title = "Chat settings", subtitle = "Conversation appearance and behavior", onClick = { onOpenStub("Chat settings") })
             }
             Spacer12()
             SettingsGroup {
@@ -134,25 +134,24 @@ fun MoreSettingsScreen(
             SettingsGroup {
                 SettingsRow(title = "Text messages", onClick = { onOpenStub("Text messages") })
                 Divider()
-                SettingsRow(title = "Multimedia messages", onClick = { onOpenStub("Multimedia messages") })
+                SettingsRow(title = "SMS delivery", subtitle = "Delivery reports and message handling", onClick = { onOpenStub("SMS delivery") })
             }
             Spacer12()
             SettingsGroup {
                 SettingsRow(title = "Quick responses", onClick = onOpenQuickResponses)
                 Divider()
-                SettingsRow(title = "Push messages", subtitle = "Prompt", subtitleIsLink = true, onClick = { onOpenStub("Push messages") })
+                SettingsRow(title = "SMS templates", subtitle = "Quick responses and reusable messages", onClick = onOpenQuickResponses)
                 Divider()
-                SettingsRow(title = "Broadcast channels", subtitle = "Off", subtitleIsLink = true, onClick = { onOpenStub("Broadcast channels") })
+                SettingsRow(title = "Notifications", subtitle = "Sounds, vibration and quick replies", onClick = { onOpenStub("Notifications") })
+                Divider()
+                SettingsRow(title = "Block numbers and spam", subtitle = "Blocked and unknown senders", onClick = { onOpenStub("Block numbers and spam") })
                 Divider()
                 SettingsRow(
                     title = "Preview web links from contacts",
                     trailing = { Switch(checked = settings.showLinkPreviews, onCheckedChange = onSetShowLinkPreviews) },
                 )
                 Divider()
-                SettingsRow(
-                    title = "Remove location from shared images",
-                    trailing = { Switch(checked = settings.removeLocationFromSharedImages, onCheckedChange = onSetRemoveLocation) },
-                )
+                SettingsRow(title = "App appearance", subtitle = "Theme, font size and conversation density", onClick = { onOpenStub("App appearance") })
                 Divider()
                 AutoDeleteRow(currentDays = settings.autoDeleteDays, onSelect = onSetAutoDeleteDays)
             }

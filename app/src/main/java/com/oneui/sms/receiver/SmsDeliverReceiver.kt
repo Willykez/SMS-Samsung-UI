@@ -7,6 +7,8 @@ import android.content.Intent
 import android.provider.Telephony
 import androidx.core.content.ContextCompat
 import com.oneui.sms.data.SmsRepository
+import com.oneui.sms.data.SettingsRepository
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -35,10 +37,42 @@ class SmsDeliverReceiver : BroadcastReceiver() {
 
         val repo = SmsRepository(context.applicationContext)
         CoroutineScope(Dispatchers.IO).launch {
-            repo.refreshConversations()
+            val threadId = Telephony.Threads.getOrCreateThreadId(context, setOf(sender))
+            val blocked = repo.isBlocked(sender)
+            if (!blocked) {
+                repo.refreshConversations()
+                val settings = SettingsRepository(context.applicationContext).observe().first()
+                if (settings.notificationsEnabled) {
+                    MessageNotification.show(
+                        context, sender, body, threadId,
+                        muted = false,
+                        withReply = settings.quickReplyNotifications,
+                        withSound = settings.notificationSoundEnabled,
+                        withVibration = settings.notificationVibrationEnabled,
+                    )
+                }
+            }
         }
+    }
+}
 
-        // TODO: post a One UI-style heads-up notification here (grouped by thread,
-        // with a quick-reply RemoteInput action) once notification design is in scope.
+
+class SmsSentReceiver : BroadcastReceiver() {
+    override fun onReceive(context: Context, intent: Intent) {
+        val id = intent.getLongExtra("messageId", Long.MIN_VALUE)
+        if (id == Long.MIN_VALUE) return
+        kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch {
+            SmsRepository(context.applicationContext).setMessageStatus(id, if (resultCode == android.app.Activity.RESULT_OK) com.oneui.sms.data.local.DeliveryStatus.SENT else com.oneui.sms.data.local.DeliveryStatus.FAILED)
+        }
+    }
+}
+
+class SmsDeliveredReceiver : BroadcastReceiver() {
+    override fun onReceive(context: Context, intent: Intent) {
+        val id = intent.getLongExtra("messageId", Long.MIN_VALUE)
+        if (id == Long.MIN_VALUE) return
+        kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch {
+            SmsRepository(context.applicationContext).setMessageStatus(id, com.oneui.sms.data.local.DeliveryStatus.DELIVERED)
+        }
     }
 }

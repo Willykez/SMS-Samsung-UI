@@ -6,6 +6,7 @@ import com.oneui.sms.data.SettingsRepository
 import com.oneui.sms.data.SmsRepository
 import com.oneui.sms.data.local.CategoryEntity
 import com.oneui.sms.data.local.ConversationEntity
+import com.oneui.sms.data.local.MessageEntity
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -23,6 +24,8 @@ class ConversationListViewModel(
 ) : ViewModel() {
 
     private val selectedCategory = MutableStateFlow(CATEGORY_ALL)
+    private val searchQuery = MutableStateFlow("")
+    val searchResults: StateFlow<List<MessageEntity>> = searchQuery.flatMapLatest { q -> repository.searchAllMessages(q) }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
     val currentCategory: StateFlow<String> = selectedCategory
 
     val categories: StateFlow<List<CategoryEntity>> = settingsRepository.observeCategories()
@@ -58,6 +61,7 @@ class ConversationListViewModel(
     fun selectCategory(name: String) { selectedCategory.value = name }
 
     fun refresh() = viewModelScope.launch { repository.refreshConversations() }
+    fun setSearchQuery(query: String) { searchQuery.value = query }
     fun markAllAsRead() = viewModelScope.launch { repository.markAllRead() }
 
     fun addCategory(name: String) = viewModelScope.launch { settingsRepository.addCategory(name) }
@@ -78,6 +82,9 @@ class ConversationListViewModel(
         repository.setPinned(_selectedIds.value.toList(), pinned)
         clearSelection()
     }
+
+    fun archiveConversation(threadId: Long) = viewModelScope.launch { repository.archive(threadId, true) }
+    fun deleteConversation(threadId: Long) = viewModelScope.launch { repository.softDeleteConversations(listOf(threadId)) }
 
     fun assignSelectedToCategory(category: String?) = viewModelScope.launch {
         repository.setCategory(_selectedIds.value.toList(), category)

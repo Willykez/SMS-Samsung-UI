@@ -68,6 +68,21 @@ data class CategoryEntity(
 
 /** Single-row table (id is always 0) holding the global toggles from Settings. */
 @Entity(tableName = "settings")
+data class BlockedNumberEntity(
+    @PrimaryKey val normalizedNumber: String,
+    val displayNumber: String,
+    val reason: String? = null,
+    val blockedAt: Long = System.currentTimeMillis(),
+)
+
+@Entity(tableName = "drafts")
+data class DraftEntity(
+    @PrimaryKey val threadId: Long,
+    val address: String,
+    val body: String,
+    val updatedAt: Long = System.currentTimeMillis(),
+)
+
 data class SettingsEntity(
     @PrimaryKey val id: Int = 0,
     val recycleBinEnabled: Boolean = true,       // #9
@@ -76,4 +91,17 @@ data class SettingsEntity(
     val fontScale: Float = 1.0f,                  // #8
     val categoriesEnabled: Boolean = true,        // conversation categories on/off
     val removeLocationFromSharedImages: Boolean = false,
+    val notificationsEnabled: Boolean = true,
+    val notificationSoundEnabled: Boolean = true,
+    val notificationVibrationEnabled: Boolean = true,
+    val quickReplyNotifications: Boolean = true,
+    val deliveryReports: Boolean = false,
+    val confirmLongSms: Boolean = false,
+    val showSegmentCount: Boolean = true,
+    val autoDetectOtp: Boolean = true,
+    val compactConversations: Boolean = false,
+    val showContactAvatars: Boolean = true,
+    val animateMessages: Boolean = true,
+    val themeMode: String = "system",
 )
+

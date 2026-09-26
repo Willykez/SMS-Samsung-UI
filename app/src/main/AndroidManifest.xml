@@ -46,6 +46,10 @@
           Even in an SMS-only scope, the OS still checks that an MMS receiver
           exists; ours simply no-ops since MMS is explicitly out of scope.
         -->
+        <receiver android:name=".receiver.SmsSentReceiver" android:exported="false" />
+        <receiver android:name=".receiver.SmsDeliveredReceiver" android:exported="false" />
+        <receiver android:name=".receiver.NotificationReplyReceiver" android:exported="false" />
+
         <receiver
             android:name=".receiver.SmsDeliverReceiver"
             android:exported="true"

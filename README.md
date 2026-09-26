@@ -117,3 +117,65 @@ All 15 Samsung Messages settings from the spec are now wired end-to-end
    can send/receive SMS to each other via the emulator console).
 3. On first launch you'll be prompted to set the app as your default SMS
    app — required before `Telephony.Sms` becomes writable/readable for send.
+
+## Modern UI pass
+
+The current 0.2.0 design pass adds:
+
+- Samsung One UI-inspired hierarchy, rounded surfaces and thumb-friendly controls.
+- Rich inbox filters: All, Unread, Pinned, OTP and Transactions.
+- SMS-native OTP detection with one-tap copy.
+- SMS character and segment feedback in the composer.
+- Modern conversation header with avatar, SMS status and mute controls.
+- Chat appearance controls and per-thread accent color.
+- Rich long-press actions: copy, star, reminder, delete and message info.
+- Quick-response/template workflow and scheduled SMS composer.
+- Richer settings surfaces for appearance, notifications, spam/blocking and SMS delivery.
+- SMS-only product language throughout the UI; no RCS/MMS composer or fake chat features.
+
+
+The latest visual pass keeps the One UI/Samsung Messages ergonomic philosophy but gives the app its own more modern identity:
+
+- Large, compact inbox hierarchy with a clearer "Messages / Your conversations" header
+- Dedicated in-app search for names, phone numbers and message snippets
+- Capsule filters for All / Unread / Pinned conversations
+- Cleaner category tabs with stronger selected-state treatment
+- Richer conversation rows with avatar initials, time, unread count, pinned/muted indicators and better typography
+- Improved empty/search states instead of blank lists
+- More expressive rounded surfaces, primary/secondary containers and a consistent SMS blue accent
+- Refined thread bubbles with asymmetrical corners, timestamps and delivery state indicators
+- Long-press message actions now include Copy text alongside Star, Reminder and Delete
+- Thumb-friendly composer with quick responses, scheduling actions and a long-SMS character hint
+- Edge-to-edge window support for modern Android devices
+- No fake RCS/MMS UI: the product remains explicitly SMS-first
+
+The Gradle wrapper executable bit is also restored in the project archive. Build verification is limited by this environment because the Gradle distribution cannot be downloaded without network access.
+
+## 0.3.0 Deep Functionality Pass
+
+This release turns the modern UI into a more complete SMS product while preserving the explicit SMS-only scope.
+
+### Implemented product areas
+- Modern One UI/Google Messages-inspired inbox hierarchy and filters
+- Smart inbox classification for OTP and transaction-like SMS
+- Global message search over cached SMS bodies, plus conversation search
+- Persistent drafts and a dedicated Drafts screen
+- Swipe archive/delete with undo-ready architecture and an Archived screen
+- Conversation multi-select for pin/mute/delete/category actions
+- Persistent blocked-number list with incoming-SMS suppression
+- Incoming SMS notifications with optional inline quick reply
+- Sent and delivered SMS status callbacks through SmsManager PendingIntents
+- OTP extraction and one-tap code copying
+- Scheduled SMS with cancel, send-now, and reschedule actions
+- Starred messages and message reminders
+- Conversation contact/profile surface and call action
+- Message information surface with status, timestamp, characters, and SMS segments
+- Quick replies/templates
+- Per-conversation mute and accent color customization
+- Light, dark, system, and AMOLED appearance modes
+- Notification, SMS delivery, spam, appearance, and messaging settings persisted in Room
+- SMS character/segment feedback in the composer
+- SMS-native long-message controls and no RCS/MMS feature UI
+
+### Platform notes
+OneMessages remains a default-SMS-app candidate and retains the minimal MMS/WAP-PUSH stub required by Android role eligibility; MMS content is not parsed, stored, displayed, or composed by the app.

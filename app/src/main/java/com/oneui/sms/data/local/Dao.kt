@@ -82,6 +82,9 @@ interface MessageDao {
     @Query("SELECT * FROM messages WHERE threadId = :threadId AND deletedAt IS NULL AND body LIKE '%' || :query || '%' ORDER BY timestamp ASC")
     fun searchInThread(threadId: Long, query: String): Flow<List<MessageEntity>>
 
+    @Query("SELECT * FROM messages WHERE deletedAt IS NULL AND body LIKE '%' || :query || '%' ORDER BY timestamp DESC LIMIT 100")
+    fun searchAll(query: String): Flow<List<MessageEntity>>
+
     // #2 starred messages, across all threads
     @Query("SELECT * FROM messages WHERE isStarred = 1 AND deletedAt IS NULL ORDER BY timestamp DESC")
     fun observeStarred(): Flow<List<MessageEntity>>
@@ -166,4 +169,29 @@ interface SettingsDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(settings: SettingsEntity)
+}
+
+
+@Dao
+interface BlockedNumberDao {
+    @Query("SELECT * FROM blocked_numbers ORDER BY blockedAt DESC")
+    fun observeAll(): Flow<List<BlockedNumberEntity>>
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsert(item: BlockedNumberEntity)
+    @Query("DELETE FROM blocked_numbers WHERE normalizedNumber = :number")
+    suspend fun remove(number: String)
+    @Query("SELECT EXISTS(SELECT 1 FROM blocked_numbers WHERE normalizedNumber = :number)")
+    suspend fun isBlocked(number: String): Boolean
+}
+
+@Dao
+interface DraftDao {
+    @Query("SELECT * FROM drafts WHERE threadId = :threadId")
+    fun observe(threadId: Long): Flow<DraftEntity?>
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsert(draft: DraftEntity)
+    @Query("DELETE FROM drafts WHERE threadId = :threadId")
+    suspend fun delete(threadId: Long)
+    @Query("SELECT * FROM drafts ORDER BY updatedAt DESC")
+    fun observeAll(): Flow<List<DraftEntity>>
 }

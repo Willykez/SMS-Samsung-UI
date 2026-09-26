@@ -22,6 +22,8 @@ import com.oneui.sms.ui.contacts.ContactsViewModel
 import com.oneui.sms.ui.conversations.ConversationListScreen
 import com.oneui.sms.ui.conversations.ConversationListViewModel
 import com.oneui.sms.ui.conversations.EditCategoriesScreen
+import com.oneui.sms.ui.conversations.ArchiveScreen
+import com.oneui.sms.ui.conversations.DraftsScreen
 import com.oneui.sms.ui.conversations.UnreadMessagesScreen
 import com.oneui.sms.ui.conversations.UnreadMessagesViewModel
 import com.oneui.sms.ui.recyclebin.RecycleBinScreen
@@ -39,6 +41,7 @@ import com.oneui.sms.ui.starred.StarredMessagesViewModel
 import com.oneui.sms.ui.thread.MessageThreadScreen
 import com.oneui.sms.ui.thread.MessageThreadViewModel
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.first
 
 private object Routes {
     const val LIST = "list"
@@ -46,6 +49,8 @@ private object Routes {
     const val STARRED = "starred"
     const val SCHEDULED = "scheduled"
     const val RECYCLE_BIN = "recycle_bin"
+    const val ARCHIVE = "archive"
+    const val DRAFTS = "drafts"
     const val SETTINGS = "settings"
     const val MORE_SETTINGS = "more_settings"
     const val QUICK_RESPONSES = "quick_responses"
@@ -73,6 +78,7 @@ fun OneMessagesNavHost(navController: NavHostController = rememberNavController(
             val currentCategory by vm.currentCategory.collectAsState()
             val selectedIds by vm.selectedIds.collectAsState()
             val totalUnread by vm.totalUnreadCount.collectAsState()
+            val searchResults by vm.searchResults.collectAsState()
             val scope = rememberCoroutineScope()
 
             val contactPicker = rememberLauncherForActivityResult(ActivityResultContracts.PickContact()) { uri ->
@@ -111,6 +117,8 @@ fun OneMessagesNavHost(navController: NavHostController = rememberNavController(
                 currentCategory = currentCategory,
                 selectedIds = selectedIds,
                 totalUnreadCount = totalUnread,
+                searchResults = searchResults,
+                onSearchQueryChange = vm::setSearchQuery,
                 onSelectCategory = vm::selectCategory,
                 onOpenConversation = { threadId ->
                     val address = conversations.first { it.threadId == threadId }.address
@@ -124,6 +132,10 @@ fun OneMessagesNavHost(navController: NavHostController = rememberNavController(
                 onOpenStarred = { navController.navigate(Routes.STARRED) },
                 onOpenScheduled = { navController.navigate(Routes.SCHEDULED) },
                 onOpenRecycleBin = { navController.navigate(Routes.RECYCLE_BIN) },
+                onOpenArchive = { navController.navigate(Routes.ARCHIVE) },
+                onOpenDrafts = { navController.navigate(Routes.DRAFTS) },
+                onArchiveConversation = vm::archiveConversation,
+                onDeleteConversation = vm::deleteConversation,
                 onOpenEditCategories = { navController.navigate(Routes.EDIT_CATEGORIES) },
                 onOpenSettings = { navController.navigate(Routes.SETTINGS) },
                 onOpenContacts = { navController.navigate(Routes.CONTACTS) },
@@ -146,7 +158,8 @@ fun OneMessagesNavHost(navController: NavHostController = rememberNavController(
             val conversation by vm.conversation.collectAsState()
 
             MessageThreadScreen(
-                contactName = address,
+                contactName = conversation?.displayName ?: address,
+                contactAddress = address,
                 messages = messages,
                 draft = draft,
                 isSearching = isSearching,
@@ -157,10 +170,11 @@ fun OneMessagesNavHost(navController: NavHostController = rememberNavController(
                 onSetChatColor = vm::setChatColor,
                 isMuted = conversation?.isMuted ?: false,
                 onSetMuted = vm::setMuted,
+                onBlockNumber = { kotlinx.coroutines.MainScope().launch { repository.blockNumber(address, "Blocked from conversation") } },
                 onSetReminder = vm::setReminder,
                 onDraftChange = vm::onDraftChange,
                 onSearchQueryChange = vm::onSearchQueryChange,
-                onToggleSearch = { vm.onSearchQueryChange("") },
+                onToggleSearch = vm::toggleSearch,
                 onSend = vm::send,
                 onToggleStar = vm::toggleStar,
                 onDeleteMessage = vm::deleteMessage,
@@ -187,7 +201,26 @@ fun OneMessagesNavHost(navController: NavHostController = rememberNavController(
         composable(Routes.SCHEDULED) {
             val vm = remember { ScheduledMessagesViewModel(repository) }
             val scheduled by vm.scheduled.collectAsState()
-            ScheduledMessagesScreen(messages = scheduled, onCancel = vm::cancel, onBack = { navController.popBackStack() })
+            ScheduledMessagesScreen(messages = scheduled, onCancel = vm::cancel, onReschedule = vm::reschedule, onSendNow = vm::sendNow, onBack = { navController.popBackStack() })
+        }
+
+        composable(Routes.ARCHIVE) {
+            ArchiveScreen(repository, onBack = { navController.popBackStack() }, onOpen = { threadId ->
+                val c = repository.observeArchived()
+                kotlinx.coroutines.MainScope().launch {
+                    val item = c.first().firstOrNull { it.threadId == threadId }
+                    if (item != null) navController.navigate(Routes.thread(item.threadId, item.address))
+                }
+            })
+        }
+
+        composable(Routes.DRAFTS) {
+            DraftsScreen(repository, onBack = { navController.popBackStack() }, onOpen = { threadId ->
+                kotlinx.coroutines.MainScope().launch {
+                    val item = repository.observeDrafts().first().firstOrNull { it.threadId == threadId }
+                    if (item != null) navController.navigate(Routes.thread(item.threadId, item.address))
+                }
+            })
         }
 
         composable(Routes.RECYCLE_BIN) {
@@ -278,7 +311,7 @@ fun OneMessagesNavHost(navController: NavHostController = rememberNavController(
             arguments = listOf(navArgument("title") { type = NavType.StringType }),
         ) { backStackEntry ->
             val title = backStackEntry.arguments?.getString("title") ?: "Settings"
-            StubScreen(title = title, onBack = { navController.popBackStack() })
+            StubScreen(title = title, repository = settingsRepository, smsRepository = repository, onBack = { navController.popBackStack() })
         }
     }
 }

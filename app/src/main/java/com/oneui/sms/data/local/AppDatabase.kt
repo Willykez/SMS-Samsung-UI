@@ -23,8 +23,10 @@ class Converters {
         QuickResponseEntity::class,
         SettingsEntity::class,
         CategoryEntity::class,
+        BlockedNumberEntity::class,
+        DraftEntity::class,
     ],
-    version = 3,
+    version = 4,
     exportSchema = false,
 )
 @TypeConverters(Converters::class)
@@ -35,6 +37,8 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun quickResponseDao(): QuickResponseDao
     abstract fun settingsDao(): SettingsDao
     abstract fun categoryDao(): CategoryDao
+    abstract fun blockedNumberDao(): BlockedNumberDao
+    abstract fun draftDao(): DraftDao
 
     companion object {
         @Volatile private var instance: AppDatabase? = null

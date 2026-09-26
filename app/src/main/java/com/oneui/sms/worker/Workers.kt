@@ -59,7 +59,9 @@ class ScheduledSendWorker(appContext: Context, params: WorkerParameters) :
         val body = inputData.getString(KEY_BODY) ?: return Result.failure()
         if (threadId == -1L) return Result.failure()
 
-        SmsRepository(applicationContext).sendMessage(threadId, address, body)
+        val repo = SmsRepository(applicationContext)
+        repo.sendMessage(threadId, address, body)
+        repo.cancelScheduled(inputData.getLong(KEY_MESSAGE_ID, -1L))
         return Result.success()
     }
 }
