@@ -38,6 +38,8 @@ object OneUiTokens {
     val PillShape = RoundedCornerShape(20.dp)
     val CardShape = RoundedCornerShape(24.dp)
     val ComposerShape = RoundedCornerShape(26.dp)
+    val ListItemShape = RoundedCornerShape(18.dp)
+    val DialogShape = RoundedCornerShape(28.dp)
 }
 
 @Composable

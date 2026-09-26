@@ -21,7 +21,6 @@ import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Card
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -42,6 +41,8 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.oneui.sms.data.SmsRepository
+import com.oneui.sms.ui.theme.OneUiSectionCard
+import com.oneui.sms.ui.theme.OneUiTokens
 import com.oneui.sms.data.local.MessageEntity
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -87,34 +88,49 @@ fun ScheduledMessagesScreen(
     ) { padding ->
         LazyColumn(
             modifier = Modifier.fillMaxSize().padding(padding),
-            contentPadding = PaddingValues(12.dp),
+            contentPadding = PaddingValues(OneUiTokens.PageHorizontal, 8.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             items(messages, key = { it.id }) { msg ->
-                Card(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
-                    Row(
-                        Modifier.fillMaxWidth().padding(12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                    ) {
-                        Column(Modifier.weight(1f)) {
-                            Text(msg.address, style = MaterialTheme.typography.labelMedium)
-                            Text(msg.body)
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(
-                                    Icons.Filled.Schedule,
-                                    contentDescription = null,
-                                    modifier = Modifier.padding(end = 4.dp),
-                                )
+                OneUiSectionCard {
+                    Column(Modifier.fillMaxWidth().padding(16.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                Icons.Filled.Schedule,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.padding(end = 10.dp),
+                            )
+                            Column(Modifier.weight(1f)) {
+                                Text(msg.address, style = MaterialTheme.typography.titleMedium)
                                 Text(
-                                    "Will be sent: ${formatter.format(Date(msg.scheduledAt ?: msg.timestamp))}",
-                                    style = MaterialTheme.typography.labelSmall,
+                                    formatter.format(Date(msg.scheduledAt ?: msg.timestamp)),
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.primary,
                                 )
                             }
                         }
-                        Row {
-                            IconButton(onClick = { onSendNow(msg) }) { Icon(Icons.Filled.Send, "Send now") }
-                            IconButton(onClick = { editing = msg }) { Icon(Icons.Filled.Edit, "Reschedule") }
-                            IconButton(onClick = { onCancel(msg.id) }) { Icon(Icons.Filled.Close, "Cancel") }
+                        Text(
+                            msg.body,
+                            style = MaterialTheme.typography.bodyLarge,
+                            modifier = Modifier.padding(top = 12.dp),
+                        )
+                        Row(
+                            modifier = Modifier.padding(top = 12.dp),
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            TextButton(onClick = { onSendNow(msg) }) {
+                                Icon(Icons.Filled.Send, null, modifier = Modifier.padding(end = 6.dp))
+                                Text("Send now")
+                            }
+                            TextButton(onClick = { editing = msg }) {
+                                Icon(Icons.Filled.Edit, null, modifier = Modifier.padding(end = 6.dp))
+                                Text("Reschedule")
+                            }
+                            IconButton(onClick = { onCancel(msg.id) }) {
+                                Icon(Icons.Filled.Close, "Cancel")
+                            }
                         }
                     }
                 }
@@ -125,43 +141,61 @@ fun ScheduledMessagesScreen(
         AlertDialog(
             onDismissRequest = { editing = null },
             title = { Text("Reschedule message") },
-            text = { Text("Choose a new send date and time using the One UI picker.") },
-            confirmButton = { TextButton(onClick = {
-                val cal = java.util.Calendar.getInstance().apply {
-                    timeInMillis = msg.scheduledAt ?: System.currentTimeMillis()
+            text = { Text("Choose a new send date and time.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    openOneUiDateTimePicker(
+                        context = context,
+                        initialAt = msg.scheduledAt ?: System.currentTimeMillis(),
+                    ) { selectedAt ->
+                        onReschedule(msg, selectedAt)
+                        editing = null
+                    }
+                }) {
+                    Text("Choose time")
                 }
-                SeslDatePickerDialog(
-                    context,
-                    { _, y, m, d ->
-                        val chosen = java.util.Calendar.getInstance().apply {
-                            timeInMillis = cal.timeInMillis
-                            set(java.util.Calendar.YEAR, y)
-                            set(java.util.Calendar.MONTH, m)
-                            set(java.util.Calendar.DAY_OF_MONTH, d)
-                        }
-                        SeslTimePickerDialog(
-                            context,
-                            { _, h, min ->
-                                chosen.set(java.util.Calendar.HOUR_OF_DAY, h)
-                                chosen.set(java.util.Calendar.MINUTE, min)
-                                chosen.set(java.util.Calendar.SECOND, 0)
-                                chosen.set(java.util.Calendar.MILLISECOND, 0)
-                                if (chosen.timeInMillis > System.currentTimeMillis()) {
-                                    onReschedule(msg, chosen.timeInMillis)
-                                    editing = null
-                                }
-                            },
-                            chosen.get(java.util.Calendar.HOUR_OF_DAY),
-                            chosen.get(java.util.Calendar.MINUTE),
-                            DateFormat.is24HourFormat(context),
-                        ).show()
-                    },
-                    cal.get(java.util.Calendar.YEAR),
-                    cal.get(java.util.Calendar.MONTH),
-                    cal.get(java.util.Calendar.DAY_OF_MONTH),
-                ).show()
-            }) { Text("Choose time") },
-            dismissButton = { TextButton(onClick = { editing = null }) { Text("Cancel") } },
+            },
+            dismissButton = {
+                TextButton(onClick = { editing = null }) {
+                    Text("Cancel")
+                }
+            },
         )
     }
+}
+
+private fun openOneUiDateTimePicker(
+    context: android.content.Context,
+    initialAt: Long,
+    onPicked: (Long) -> Unit,
+) {
+    val initial = java.util.Calendar.getInstance().apply { timeInMillis = initialAt }
+    SeslDatePickerDialog(
+        context,
+        { _, year, month, day ->
+            val chosen = java.util.Calendar.getInstance().apply {
+                timeInMillis = initial.timeInMillis
+                set(java.util.Calendar.YEAR, year)
+                set(java.util.Calendar.MONTH, month)
+                set(java.util.Calendar.DAY_OF_MONTH, day)
+            }
+            SeslTimePickerDialog(
+                context,
+                { _, hour, minute ->
+                    chosen.set(java.util.Calendar.HOUR_OF_DAY, hour)
+                    chosen.set(java.util.Calendar.MINUTE, minute)
+                    chosen.set(java.util.Calendar.SECOND, 0)
+                    chosen.set(java.util.Calendar.MILLISECOND, 0)
+                    val selected = chosen.timeInMillis
+                    if (selected > System.currentTimeMillis()) onPicked(selected)
+                },
+                chosen.get(java.util.Calendar.HOUR_OF_DAY),
+                chosen.get(java.util.Calendar.MINUTE),
+                DateFormat.is24HourFormat(context)
+            ).show()
+        },
+        initial.get(java.util.Calendar.YEAR),
+        initial.get(java.util.Calendar.MONTH),
+        initial.get(java.util.Calendar.DAY_OF_MONTH)
+    ).show()
 }
