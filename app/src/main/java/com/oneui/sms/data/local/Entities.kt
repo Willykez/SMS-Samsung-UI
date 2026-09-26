@@ -13,6 +13,7 @@ data class ConversationEntity(
     @PrimaryKey val threadId: Long,
     val address: String,          // phone number / contact address
     val displayName: String?,     // resolved contact name, if any
+    val photoUri: String? = null, // contact photo URI from the local Contacts provider
     val snippet: String,          // last message preview text
     val timestamp: Long,
     val unreadCount: Int,
@@ -66,8 +67,8 @@ data class CategoryEntity(
     val sortOrder: Int = 0,
 )
 
-/** #14 — Blocked numbers list. */
-@Entity(tableName = "blocked_numbers") // ✅ FIXED: Changed from "settings" to "blocked_numbers"
+/** Single-row table (id is always 0) holding the global toggles from Settings. */
+@Entity(tableName = "blocked_numbers")
 data class BlockedNumberEntity(
     @PrimaryKey val normalizedNumber: String,
     val displayNumber: String,
@@ -83,7 +84,6 @@ data class DraftEntity(
     val updatedAt: Long = System.currentTimeMillis(),
 )
 
-/** Single-row table (id is always 0) holding the global toggles from Settings. */
 @Entity(tableName = "settings")
 data class SettingsEntity(
     @PrimaryKey val id: Int = 0,
@@ -106,3 +106,4 @@ data class SettingsEntity(
     val animateMessages: Boolean = true,
     val themeMode: String = "system",
 )
+

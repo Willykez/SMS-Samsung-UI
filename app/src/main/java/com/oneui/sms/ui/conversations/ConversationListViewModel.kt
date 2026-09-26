@@ -37,12 +37,17 @@ class ConversationListViewModel(
 
     val conversations: StateFlow<List<ConversationEntity>> = selectedCategory
         .flatMapLatest { category ->
-            if (category == CATEGORY_ALL) repository.observeConversations() else repository.observeByCategory(category)
+            if (category == CATEGORY_ALL || category == "Personal" || category == "Shipping" || category == "OTP") repository.observeConversations()
+            else repository.observeByCategory(category)
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     // Drives the bottom-nav "Conversations" tab badge — always the full unread
     // count regardless of which category tab is selected.
+    init {
+        viewModelScope.launch { repository.refreshConversations() }
+    }
+
     val totalUnreadCount: StateFlow<Int> = repository.observeConversations()
         .map { list -> list.sumOf { it.unreadCount } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)

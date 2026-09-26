@@ -1,8 +1,10 @@
 package com.oneui.sms
 
+import android.Manifest
 import android.app.role.RoleManager
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.enableEdgeToEdge
@@ -12,6 +14,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -41,6 +44,20 @@ class MainActivity : ComponentActivity() {
     private val isDefaultSmsState = mutableStateOf(false)
     // Shown on-screen (not just logcat) so this is debuggable from a screenshot alone.
     private val debugInfoState = mutableStateOf("")
+    private val permissionsReadyState = mutableStateOf(false)
+
+    private val requiredPermissions: Array<String>
+        get() = buildList {
+            add(Manifest.permission.READ_SMS)
+            add(Manifest.permission.SEND_SMS)
+            add(Manifest.permission.RECEIVE_SMS)
+            add(Manifest.permission.READ_CONTACTS)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) add(Manifest.permission.POST_NOTIFICATIONS)
+        }.toTypedArray()
+
+    private fun hasRequiredPermissions(): Boolean = requiredPermissions.all {
+        ContextCompat.checkSelfPermission(this, it) == PackageManager.PERMISSION_GRANTED
+    }
 
     private fun isDefaultSmsApp(): Boolean {
         val currentDefault = Telephony.Sms.getDefaultSmsPackage(this)
@@ -71,6 +88,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         isDefaultSmsState.value = isDefaultSmsApp()
+        permissionsReadyState.value = hasRequiredPermissions()
 
         setContent {
             val settings = SettingsRepository(applicationContext).observe().collectAsState(initial = com.oneui.sms.data.local.SettingsEntity())
@@ -81,16 +99,27 @@ class MainActivity : ComponentActivity() {
 
                     val roleLauncher = rememberLauncherForActivityResult(
                         ActivityResultContracts.StartActivityForResult(),
-                    ) { isDefaultSmsState.value = isDefaultSmsApp() }
+                    ) {
+                        isDefaultSmsState.value = isDefaultSmsApp()
+                        permissionsReadyState.value = hasRequiredPermissions()
+                    }
+                    val permissionLauncher = rememberLauncherForActivityResult(
+                        ActivityResultContracts.RequestMultiplePermissions(),
+                    ) { permissionsReadyState.value = hasRequiredPermissions() }
 
-                    if (isDefault) {
-                        OneMessagesNavHost()
-                    } else {
+                    if (!isDefault) {
                         DefaultSmsAppPrompt(
                             debugInfo = debugInfo,
                             onRequest = { requestDefaultSmsRole(roleLauncher) },
                             onCheckAgain = { isDefaultSmsState.value = isDefaultSmsApp() },
                         )
+                    } else if (!permissionsReadyState.value) {
+                        PermissionsPrompt(
+                            onRequest = { permissionLauncher.launch(requiredPermissions) },
+                            onCheckAgain = { permissionsReadyState.value = hasRequiredPermissions() },
+                        )
+                    } else {
+                        OneMessagesNavHost()
                     }
                 }
             }
@@ -100,6 +129,7 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         isDefaultSmsState.value = isDefaultSmsApp()
+        permissionsReadyState.value = hasRequiredPermissions()
     }
 
     private fun requestDefaultSmsRole(
@@ -142,5 +172,26 @@ private fun DefaultSmsAppPrompt(debugInfo: String, onRequest: () -> Unit, onChec
         androidx.compose.foundation.layout.Spacer(Modifier.padding(20.dp))
         // Temporary on-screen diagnostics — remove once this is confirmed working.
         Text(debugInfo, style = MaterialTheme.typography.labelSmall)
+    }
+}
+
+
+@androidx.compose.runtime.Composable
+private fun PermissionsPrompt(onRequest: () -> Unit, onCheckAgain: () -> Unit) {
+    Column(
+        modifier = Modifier.fillMaxSize().padding(32.dp),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Text("Allow access to your SMS history and contacts", style = MaterialTheme.typography.headlineSmall)
+        Spacer(Modifier.padding(8.dp))
+        Text(
+            "OneMessages reads the SMS database already stored on this phone and the local Contacts provider so it can show conversation names and contact photos. Nothing is uploaded to a server.",
+            style = MaterialTheme.typography.bodyMedium,
+        )
+        Spacer(Modifier.padding(16.dp))
+        Button(onClick = onRequest) { Text("Allow access") }
+        Spacer(Modifier.padding(6.dp))
+        OutlinedButton(onClick = onCheckAgain) { Text("Check again") }
     }
 }

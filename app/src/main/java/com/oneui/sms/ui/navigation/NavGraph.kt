@@ -160,6 +160,7 @@ fun OneMessagesNavHost(navController: NavHostController = rememberNavController(
             MessageThreadScreen(
                 contactName = conversation?.displayName ?: address,
                 contactAddress = address,
+                contactPhotoUri = conversation?.photoUri,
                 messages = messages,
                 draft = draft,
                 isSearching = isSearching,

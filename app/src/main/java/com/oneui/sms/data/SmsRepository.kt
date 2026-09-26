@@ -38,23 +38,8 @@ class SmsRepository(private val context: Context) {
     fun observeThread(threadId: Long): Flow<List<MessageEntity>> =
         db.messageDao().observeThread(threadId)
 
-    /** Pulls the latest state from Telephony.Sms into the local Room cache. */
-    private fun resolveDisplayName(address: String): String? {
-        val cursor = resolver.query(
-            Uri.withAppendedPath(ContactsContract.PhoneLookup.CONTENT_FILTER_URI, Uri.encode(address)),
-            arrayOf(ContactsContract.PhoneLookup.DISPLAY_NAME), null, null, null,
-        ) ?: return null
-        return cursor.use { if (it.moveToFirst()) it.getString(0) else null }
-    }
-
+    /** Pulls the device's real SMS history into the Room cache and resolves local contact names/photos. */
     suspend fun refreshConversations() = withContext(Dispatchers.IO) {
-        val projection = arrayOf(
-            Telephony.Sms.Conversations.THREAD_ID,
-            Telephony.Sms.Conversations.SNIPPET,
-        )
-        // Telephony.Sms.Conversations is deprecated in favor of manual grouping by
-        // THREAD_ID over Telephony.Sms.CONTENT_URI on modern API levels; grouping
-        // logic lives here so the rest of the app only deals with clean entities.
         val cursor = resolver.query(
             Telephony.Sms.CONTENT_URI,
             arrayOf(
@@ -64,7 +49,6 @@ class SmsRepository(private val context: Context) {
                 Telephony.Sms.BODY,
                 Telephony.Sms.DATE,
                 Telephony.Sms.READ,
-                Telephony.Sms.TYPE,
             ),
             null, null,
             "${Telephony.Sms.DATE} DESC",
@@ -72,38 +56,58 @@ class SmsRepository(private val context: Context) {
 
         val latestByThread = LinkedHashMap<Long, ConversationEntity>()
         val unreadCounts = HashMap<Long, Int>()
-
         cursor.use {
             val idxThread = it.getColumnIndexOrThrow(Telephony.Sms.THREAD_ID)
             val idxAddress = it.getColumnIndexOrThrow(Telephony.Sms.ADDRESS)
             val idxBody = it.getColumnIndexOrThrow(Telephony.Sms.BODY)
             val idxDate = it.getColumnIndexOrThrow(Telephony.Sms.DATE)
             val idxRead = it.getColumnIndexOrThrow(Telephony.Sms.READ)
-
             while (it.moveToNext()) {
                 val threadId = it.getLong(idxThread)
                 val address = it.getString(idxAddress) ?: continue
-                val read = it.getInt(idxRead)
-
-                if (read == 0) unreadCounts[threadId] = (unreadCounts[threadId] ?: 0) + 1
-
+                if (it.getInt(idxRead) == 0) unreadCounts[threadId] = (unreadCounts[threadId] ?: 0) + 1
                 if (!latestByThread.containsKey(threadId)) {
+                    val contact = resolveContact(address)
                     latestByThread[threadId] = ConversationEntity(
                         threadId = threadId,
                         address = address,
-                        displayName = null, // resolved separately via ContactsResolver
-                        snippet = it.getString(idxBody) ?: "",
+                        displayName = contact?.first,
+                        photoUri = contact?.second,
+                        snippet = it.getString(idxBody).orEmpty(),
                         timestamp = it.getLong(idxDate),
-                        unreadCount = 0, // filled below once full scan completes
+                        unreadCount = 0,
                     )
                 }
             }
         }
 
-        val merged = latestByThread.values.map { c ->
-            c.copy(unreadCount = unreadCounts[c.threadId] ?: 0)
+        val existing = db.conversationDao().getAllCached().associateBy { it.threadId }
+        val merged = latestByThread.values.map { fresh ->
+            val old = existing[fresh.threadId]
+            fresh.copy(
+                unreadCount = unreadCounts[fresh.threadId] ?: 0,
+                isPinned = old?.isPinned ?: false,
+                isArchived = old?.isArchived ?: false,
+                isMuted = old?.isMuted ?: false,
+                notificationSoundUri = old?.notificationSoundUri,
+                chatColorHex = old?.chatColorHex,
+                category = old?.category,
+                deletedAt = old?.deletedAt,
+            )
         }
-        db.conversationDao().upsertAll(merged)
+        if (merged.isNotEmpty()) db.conversationDao().upsertAll(merged)
+    }
+
+    /** Resolves a phone number against the device Contacts provider, including the contact photo. */
+    private fun resolveContact(address: String): Pair<String?, String?>? {
+        val cursor = resolver.query(
+            Uri.withAppendedPath(ContactsContract.PhoneLookup.CONTENT_FILTER_URI, Uri.encode(address)),
+            arrayOf(ContactsContract.PhoneLookup.DISPLAY_NAME, ContactsContract.PhoneLookup.PHOTO_URI),
+            null, null, null,
+        ) ?: return null
+        return cursor.use {
+            if (it.moveToFirst()) Pair(it.getString(0), it.getString(1)) else null
+        }
     }
 
     suspend fun refreshThread(threadId: Long) = withContext(Dispatchers.IO) {

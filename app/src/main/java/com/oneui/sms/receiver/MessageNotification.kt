@@ -10,9 +10,6 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.RemoteInput
 import com.oneui.sms.MainActivity
 import com.oneui.sms.R
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 
 object MessageNotification {
     const val CHANNEL = "messages"
@@ -64,9 +61,7 @@ class NotificationReplyReceiver : android.content.BroadcastReceiver() {
         val threadId = intent.getLongExtra("threadId", -1L)
         val reply = androidx.core.app.RemoteInput.getResultsFromIntent(intent)?.getCharSequence(MessageNotification.REPLY_KEY)?.toString()?.trim() ?: return
         if (threadId < 0 || reply.isEmpty()) return
-        
-        // Properly scoped coroutine with imported `launch` and `Dispatchers`
-        CoroutineScope(Dispatchers.IO).launch {
+        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
             com.oneui.sms.data.SmsRepository(context.applicationContext).sendMessage(threadId, address, reply)
         }
     }

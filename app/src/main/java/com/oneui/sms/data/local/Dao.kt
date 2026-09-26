@@ -30,6 +30,9 @@ interface ConversationDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertAll(conversations: List<ConversationEntity>)
 
+    @Query("SELECT * FROM conversations")
+    suspend fun getAllCached(): List<ConversationEntity>
+
     @Query("UPDATE conversations SET isPinned = :pinned WHERE threadId IN (:threadIds)")
     suspend fun setPinned(threadIds: List<Long>, pinned: Boolean)
 

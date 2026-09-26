@@ -151,6 +151,12 @@ The latest visual pass keeps the One UI/Samsung Messages ergonomic philosophy bu
 
 The Gradle wrapper executable bit is also restored in the project archive. Build verification is limited by this environment because the Gradle distribution cannot be downloaded without network access.
 
+## 0.4.0 Samsung Messages-style redesign + local SMS/contact sync
+
+This pass changes the inbox visual language to match the supplied Samsung Messages references: large unread hero, compact action row, All/Personal/Shipping/OTP category tabs, flat conversation rows, circular contact photos, unread count badges, and the Conversations/Contacts bottom navigation.
+
+The inbox now performs a real read-through sync from the device Telephony SMS provider and resolves each sender through the local Contacts provider using `PhoneLookup.DISPLAY_NAME` and `PHOTO_URI`. The user is asked for SMS and Contacts runtime permissions before entering the inbox. Existing local conversation state (pin, archive, mute, category, color) is preserved during refresh.
+
 ## 0.3.0 Deep Functionality Pass
 
 This release turns the modern UI into a more complete SMS product while preserving the explicit SMS-only scope.

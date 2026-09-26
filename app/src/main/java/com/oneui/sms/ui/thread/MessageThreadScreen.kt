@@ -18,6 +18,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
@@ -36,6 +37,7 @@ import android.net.Uri
 fun MessageThreadScreen(
     contactName: String,
     contactAddress: String,
+    contactPhotoUri: String? = null,
     messages: List<MessageEntity>,
     draft: String,
     isSearching: Boolean,
@@ -78,7 +80,7 @@ fun MessageThreadScreen(
                 TopAppBar(
                     title = {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Avatar(initials = contactName.take(1).uppercase())
+                            Avatar(initials = contactName.take(1).uppercase(), photoUri = contactPhotoUri)
                             Column(Modifier.padding(start = 12.dp)) {
                                 Text(contactName, fontWeight = FontWeight.SemiBold)
                                 Text(if (isMuted) "SMS · Muted" else "SMS", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -127,7 +129,7 @@ fun MessageThreadScreen(
     if (showProfile) {
         AlertDialog(
             onDismissRequest = { showProfile = false },
-            title = { Row(verticalAlignment = Alignment.CenterVertically) { Avatar(contactName.take(1).uppercase()); Column(Modifier.padding(start = 12.dp)) { Text(contactName, fontWeight = FontWeight.SemiBold); Text("SMS contact", style = MaterialTheme.typography.labelSmall) } } },
+            title = { Row(verticalAlignment = Alignment.CenterVertically) { Avatar(contactName.take(1).uppercase(), contactPhotoUri); Column(Modifier.padding(start = 12.dp)) { Text(contactName, fontWeight = FontWeight.SemiBold); Text("SMS contact", style = MaterialTheme.typography.labelSmall) } } },
             text = { Column(verticalArrangement = Arrangement.spacedBy(8.dp)) { Text(contactAddress, style = MaterialTheme.typography.bodyMedium); Text("Messages are sent as standard SMS.", color = MaterialTheme.colorScheme.onSurfaceVariant) } },
             confirmButton = { TextButton(onClick = { context.startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:${contactAddress}"))); showProfile = false }) { Text("Call") } },
             dismissButton = { TextButton(onClick = { showProfile = false }) { Text("Close") } },
@@ -138,8 +140,18 @@ fun MessageThreadScreen(
     }
 }
 
-@Composable private fun Avatar(initials: String) {
-    Surface(Modifier.size(40.dp), CircleShape, color = MaterialTheme.colorScheme.primaryContainer) { Box(contentAlignment = Alignment.Center) { Text(initials, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimaryContainer) } }
+@Composable private fun Avatar(initials: String, photoUri: String? = null) {
+    val context = LocalContext.current
+    val bitmap = remember(photoUri) {
+        photoUri?.let { runCatching { context.contentResolver.openInputStream(Uri.parse(it))?.use(android.graphics.BitmapFactory::decodeStream) }.getOrNull() }
+    }
+    Surface(Modifier.size(40.dp), CircleShape, color = MaterialTheme.colorScheme.primaryContainer) {
+        if (bitmap != null) {
+            androidx.compose.foundation.Image(bitmap.asImageBitmap(), contentDescription = initials, modifier = Modifier.fillMaxSize())
+        } else {
+            Box(contentAlignment = Alignment.Center) { Text(initials, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimaryContainer) }
+        }
+    }
 }
 
 @Composable private fun OtpCard(code: String) {
@@ -187,13 +199,8 @@ fun MessageThreadScreen(
 
 @Composable private fun ScheduleChip(time: Long, onClear: () -> Unit) {
     Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 5.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-        Row(verticalAlignment = Alignment.CenterVertically) { 
-            Icon(Icons.Filled.Schedule, null, Modifier.size(16.dp))
-            // FIXED: Added `modifier = ` to prevent mixing named and positional arguments
-            Text("Scheduled · ${SimpleDateFormat("EEE, h:mm a", Locale.getDefault()).format(Date(time))}", style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(start = 6.dp)) 
-        }
-        // FIXED: Added `modifier = `
-        IconButton(onClick = onClear, modifier = Modifier.size(32.dp)) { Icon(Icons.Filled.Close, "Cancel") }
+        Row(verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Filled.Schedule, null, Modifier.size(16.dp)); Text("Scheduled · ${SimpleDateFormat("EEE, h:mm a", Locale.getDefault()).format(Date(time))}", style = MaterialTheme.typography.labelMedium, Modifier.padding(start = 6.dp)) }
+        IconButton(onClick = onClear, Modifier.size(32.dp)) { Icon(Icons.Filled.Close, "Cancel") }
     }
 }
 
@@ -202,21 +209,12 @@ fun MessageThreadScreen(
     Surface(tonalElevation = 4.dp) {
         Column(Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 8.dp)) {
             Row(verticalAlignment = Alignment.Bottom) {
-                // FIXED: Added `modifier = `
-                IconButton(onClick = onQuick, modifier = Modifier.size(48.dp)) { Icon(Icons.Filled.Bolt, "Quick replies") }
+                IconButton(onClick = onQuick, Modifier.size(48.dp)) { Icon(Icons.Filled.Bolt, "Quick replies") }
                 Box {
-                    // FIXED: Added `modifier = `
-                    IconButton(onClick = { onSetSchedule(System.currentTimeMillis() + 60 * 60_000L) }, modifier = Modifier.size(48.dp)) { Icon(if (scheduled) Icons.Filled.Schedule else Icons.Filled.CalendarMonth, "Schedule SMS") }
+                    IconButton(onClick = { onSetSchedule(System.currentTimeMillis() + 60 * 60_000L) }, Modifier.size(48.dp)) { Icon(if (scheduled) Icons.Filled.Schedule else Icons.Filled.CalendarMonth, "Schedule SMS") }
                 }
                 OutlinedTextField(value = draft, onValueChange = onDraftChange, modifier = Modifier.weight(1f), placeholder = { Text("Text message") }, shape = MaterialTheme.shapes.extraLarge, maxLines = 5, colors = TextFieldDefaults.colors(unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant, focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant, unfocusedIndicatorColor = Color.Transparent, focusedIndicatorColor = Color.Transparent))
-                // FIXED: Added `modifier = `
-                IconButton(onClick = onSend, enabled = draft.isNotBlank(), modifier = Modifier.size(48.dp)) { 
-                    Surface(Modifier.size(40.dp), CircleShape, color = if (draft.isNotBlank()) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant) { 
-                        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { 
-                            Icon(if (scheduled) Icons.Filled.Schedule else Icons.Filled.Send, null, tint = if (draft.isNotBlank()) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant) 
-                        } 
-                    } 
-                }
+                IconButton(onClick = onSend, enabled = draft.isNotBlank(), Modifier.size(48.dp)) { Surface(Modifier.size(40.dp), CircleShape, color = if (draft.isNotBlank()) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant) { Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Icon(if (scheduled) Icons.Filled.Schedule else Icons.Filled.Send, null, tint = if (draft.isNotBlank()) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant) } } }
             }
             if (draft.isNotEmpty()) Text("${draft.length} characters · $segments SMS ${if (segments == 1) "segment" else "segments"}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(start = 56.dp, top = 3.dp))
         }
