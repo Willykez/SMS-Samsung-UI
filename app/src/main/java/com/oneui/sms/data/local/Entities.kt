@@ -66,8 +66,8 @@ data class CategoryEntity(
     val sortOrder: Int = 0,
 )
 
-/** Single-row table (id is always 0) holding the global toggles from Settings. */
-@Entity(tableName = "settings")
+/** #14 — Blocked numbers list. */
+@Entity(tableName = "blocked_numbers") // ✅ FIXED: Changed from "settings" to "blocked_numbers"
 data class BlockedNumberEntity(
     @PrimaryKey val normalizedNumber: String,
     val displayNumber: String,
@@ -83,6 +83,7 @@ data class DraftEntity(
     val updatedAt: Long = System.currentTimeMillis(),
 )
 
+/** Single-row table (id is always 0) holding the global toggles from Settings. */
 @Entity(tableName = "settings")
 data class SettingsEntity(
     @PrimaryKey val id: Int = 0,
@@ -105,4 +106,3 @@ data class SettingsEntity(
     val animateMessages: Boolean = true,
     val themeMode: String = "system",
 )
-
