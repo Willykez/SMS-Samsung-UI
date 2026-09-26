@@ -199,7 +199,7 @@ fun MessageThreadScreen(
 
 @Composable private fun ScheduleChip(time: Long, onClear: () -> Unit) {
     Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 5.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-        Row(verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Filled.Schedule, null, Modifier.size(16.dp)); Text("Scheduled · ${SimpleDateFormat("EEE, h:mm a", Locale.getDefault()).format(Date(time))}", style = MaterialTheme.typography.labelMedium, Modifier.padding(start = 6.dp)) }
+        Row(verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Filled.Schedule, null, Modifier.size(16.dp)); Text("Scheduled · ${SimpleDateFormat("EEE, h:mm a", Locale.getDefault()).format(Date(time))}", modifier = Modifier.padding(start = 6.dp), style = MaterialTheme.typography.labelMedium) }
         IconButton(onClick = onClear, Modifier.size(32.dp)) { Icon(Icons.Filled.Close, "Cancel") }
     }
 }
@@ -214,7 +214,7 @@ fun MessageThreadScreen(
                     IconButton(onClick = { onSetSchedule(System.currentTimeMillis() + 60 * 60_000L) }, Modifier.size(48.dp)) { Icon(if (scheduled) Icons.Filled.Schedule else Icons.Filled.CalendarMonth, "Schedule SMS") }
                 }
                 OutlinedTextField(value = draft, onValueChange = onDraftChange, modifier = Modifier.weight(1f), placeholder = { Text("Text message") }, shape = MaterialTheme.shapes.extraLarge, maxLines = 5, colors = TextFieldDefaults.colors(unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant, focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant, unfocusedIndicatorColor = Color.Transparent, focusedIndicatorColor = Color.Transparent))
-                IconButton(onClick = onSend, enabled = draft.isNotBlank(), Modifier.size(48.dp)) { Surface(Modifier.size(40.dp), CircleShape, color = if (draft.isNotBlank()) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant) { Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Icon(if (scheduled) Icons.Filled.Schedule else Icons.Filled.Send, null, tint = if (draft.isNotBlank()) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant) } } }
+                IconButton(onClick = onSend, enabled = draft.isNotBlank(), modifier = Modifier.size(48.dp)) { Surface(Modifier.size(40.dp), CircleShape, color = if (draft.isNotBlank()) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant) { Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Icon(if (scheduled) Icons.Filled.Schedule else Icons.Filled.Send, null, tint = if (draft.isNotBlank()) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant) } } }
             }
             if (draft.isNotEmpty()) Text("${draft.length} characters · $segments SMS ${if (segments == 1) "segment" else "segments"}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(start = 56.dp, top = 3.dp))
         }

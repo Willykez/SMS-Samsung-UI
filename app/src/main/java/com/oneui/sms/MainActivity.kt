@@ -17,6 +17,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
@@ -161,15 +162,15 @@ private fun DefaultSmsAppPrompt(debugInfo: String, onRequest: () -> Unit, onChec
             "To send and receive SMS, this needs to be set as your default messaging app.",
             style = MaterialTheme.typography.titleMedium,
         )
-        androidx.compose.foundation.layout.Spacer(Modifier.padding(12.dp))
+        Spacer(Modifier.padding(12.dp))
         Button(onClick = onRequest) {
             Text("Set as default SMS app")
         }
-        androidx.compose.foundation.layout.Spacer(Modifier.padding(8.dp))
+        Spacer(Modifier.padding(8.dp))
         OutlinedButton(onClick = onCheckAgain) {
             Text("Already set it — check again")
         }
-        androidx.compose.foundation.layout.Spacer(Modifier.padding(20.dp))
+        Spacer(Modifier.padding(20.dp))
         // Temporary on-screen diagnostics — remove once this is confirmed working.
         Text(debugInfo, style = MaterialTheme.typography.labelSmall)
     }
