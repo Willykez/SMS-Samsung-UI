@@ -12,8 +12,8 @@ android {
         applicationId = "com.oneui.sms"
         minSdk = 26 // required realistically for default-SMS-app role APIs used here
         targetSdk = 35
-        versionCode = 9
-        versionName = "0.9.0"
+        versionCode = 10
+        versionName = "1.0.0"
     }
 
     buildFeatures {

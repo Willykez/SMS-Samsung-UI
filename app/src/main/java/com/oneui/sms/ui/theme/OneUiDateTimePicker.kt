@@ -6,16 +6,14 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.wrapContentHeight
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.DatePicker
-import androidx.compose.material3.DatePickerDialog
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TimePicker
-import androidx.compose.material3.TimePickerDialog
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
@@ -32,11 +30,11 @@ import java.time.ZoneId
 import java.util.Calendar
 
 /**
- * Compose port of the supplied One UI picker catalog's two-stage date/time
- * interaction. It deliberately uses the current AndroidX/Material3 picker
- * primitives so it can coexist with ComponentActivity/Compose, while retaining
- * the catalog's large header, rounded surface, primary action and two-step flow.
+ * Compose-native One UI inspired date/time picker based on the supplied catalog.
+ * It intentionally avoids SESL/legacy AndroidX forks so the application keeps
+ * one coherent modern AndroidX dependency graph.
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun OneUiDateTimePickerDialog(
     initialAt: Long,
@@ -61,79 +59,71 @@ fun OneUiDateTimePickerDialog(
         is24Hour = DateFormat.is24HourFormat(context),
     )
 
-    if (step == 0) {
-        DatePickerDialog(
-            onDismissRequest = onDismiss,
-            confirmButton = {
-                TextButton(
-                    onClick = { if (dateState.selectedDateMillis != null) step = 1 },
-                ) { Text("Next") }
-            },
-            dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
-        ) {
-            Surface(
-                modifier = Modifier.wrapContentHeight(),
-                shape = OneUiTokens.DialogShape,
-                color = MaterialTheme.colorScheme.surface,
-            ) {
-                Column {
-                    PickerHeader(title = "Choose date", subtitle = "When should this message be sent?")
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        shape = OneUiTokens.DialogShape,
+        title = {
+            PickerHeader(
+                title = if (step == 0) "Choose date" else "Choose time",
+                subtitle = if (step == 0) "When should this message be sent?" else "Set the send time",
+            )
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (step == 0) {
                     DatePicker(
                         state = dateState,
                         modifier = Modifier.fillMaxWidth(),
                         showModeToggle = false,
                     )
+                } else {
+                    TimePicker(
+                        state = timeState,
+                        modifier = Modifier.align(Alignment.CenterHorizontally),
+                    )
                 }
             }
-        }
-    } else {
-        TimePickerDialog(
-            onDismiss = onDismiss,
-            confirmButton = {
-                Button(onClick = {
+        },
+        confirmButton = {
+            Button(onClick = {
+                if (step == 0) {
+                    if (dateState.selectedDateMillis != null) step = 1
+                } else {
                     val selected = Calendar.getInstance().apply {
-                        val millis = dateState.selectedDateMillis ?: initialDateMillis
-                        timeInMillis = millis
+                        timeInMillis = dateState.selectedDateMillis ?: initialDateMillis
                         set(Calendar.HOUR_OF_DAY, timeState.hour)
                         set(Calendar.MINUTE, timeState.minute)
                         set(Calendar.SECOND, 0)
                         set(Calendar.MILLISECOND, 0)
                     }.timeInMillis
                     if (selected > System.currentTimeMillis()) onPicked(selected) else onDismiss()
-                }) { Text("Done") }
-            },
-            dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
-        ) {
-            Surface(
-                modifier = Modifier.wrapContentHeight(),
-                shape = OneUiTokens.DialogShape,
-                color = MaterialTheme.colorScheme.surface,
-            ) {
-                Column(
-                    modifier = Modifier.padding(bottom = 8.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp),
-                ) {
-                    PickerHeader(title = "Choose time", subtitle = "Set the send time")
-                    TimePicker(state = timeState, modifier = Modifier.align(Alignment.CenterHorizontally))
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp),
-                        horizontalArrangement = Arrangement.End,
-                    ) {
-                        TextButton(onClick = { step = 0 }) { Text("Back") }
-                    }
                 }
+            }) {
+                Text(if (step == 0) "Next" else "Done")
             }
-        }
-    }
+        },
+        dismissButton = {
+            Row(horizontalArrangement = Arrangement.End) {
+                if (step == 1) {
+                    TextButton(onClick = { step = 0 }) { Text("Back") }
+                }
+                TextButton(onClick = onDismiss) { Text("Cancel") }
+            }
+        },
+    )
 }
 
 @Composable
 private fun PickerHeader(title: String, subtitle: String) {
     Column(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 18.dp),
+        modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         Text(title, style = MaterialTheme.typography.headlineSmall)
-        Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(
+            subtitle,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
